@@ -1,0 +1,103 @@
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+}
+
+export interface ChatCompletionChoice {
+  index: number
+  message: ChatMessage
+  finish_reason: string | null
+}
+
+export interface ChatCompletionResponse {
+  id: string
+  object: string
+  created: number
+  model: string
+  choices: ChatCompletionChoice[]
+  usage?: {
+    prompt_tokens: number
+    completion_tokens: number
+    total_tokens: number
+  }
+}
+
+const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || 'http://localhost:18789'
+const GATEWAY_TOKEN = process.env.NEXT_PUBLIC_GATEWAY_TOKEN || ''
+
+/**
+ * Proxy chat request through Next.js API (token stays server-side)
+ */
+export async function sendMessage(
+  agentId: string,
+  messages: ChatMessage[],
+  onStream?: (chunk: string) => void
+): Promise<string> {
+  const res = await fetch(`/api/chat?agentId=${agentId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages, stream: !!onStream }),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Chat error (${res.status}): ${err}`)
+  }
+
+  // Streaming
+  if (onStream && res.body) {
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let full = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      const chunk = decoder.decode(value, { stream: true })
+      const lines = chunk.split('\n').filter(l => l.startsWith('data: '))
+
+      for (const line of lines) {
+        const data = line.slice(6)
+        if (data === '[DONE]') continue
+        try {
+          const parsed = JSON.parse(data)
+          const content = parsed.choices?.[0]?.delta?.content || ''
+          if (content) {
+            full += content
+            onStream(content)
+          }
+        } catch { /* skip malformed */ }
+      }
+    }
+    return full
+  }
+
+  // Non-streaming
+  const data: ChatCompletionResponse = await res.json()
+  return data.choices?.[0]?.message?.content || ''
+}
+
+/**
+ * Direct call to Gateway (used by API route)
+ */
+export async function directChat(
+  agentId: string,
+  messages: ChatMessage[],
+  stream: boolean
+): Promise<Response> {
+  const token = process.env.GATEWAY_TOKEN || ''
+
+  return fetch(`${GATEWAY_URL}/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'openclaw',
+      stream,
+      messages,
+    }),
+  })
+}
