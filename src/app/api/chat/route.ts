@@ -3,6 +3,12 @@ import { getAgent } from '@/lib/agents'
 
 const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:18789'
 const GATEWAY_TOKEN = process.env.GATEWAY_TOKEN || ''
+// clawdbot-railway-template melindungi proxy utamanya (termasuk
+// /v1/chat/completions) dengan requireDashboardAuth — itu mewajibkan HTTP
+// Basic Auth (username bebas/kosong, password = SETUP_PASSWORD di sisi
+// clawdbot), BUKAN skema Bearer. GATEWAY_TOKEN di sini isinya harus sama
+// dengan SETUP_PASSWORD clawdbot, dikirim sebagai Basic, bukan Bearer.
+const BASIC_AUTH = 'Basic ' + Buffer.from(`:${GATEWAY_TOKEN}`).toString('base64')
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,7 +27,7 @@ export async function POST(req: NextRequest) {
     const gwRes = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${GATEWAY_TOKEN}`,
+        'Authorization': BASIC_AUTH,
         'Content-Type': 'application/json',
         'x-openclaw-agent-id': agentId,
       },

@@ -80,6 +80,11 @@ export async function sendMessage(
 
 /**
  * Direct call to Gateway (used by API route)
+ *
+ * NOTE: saat ini tidak dipanggil dari mana pun di codebase (api/chat/route.ts
+ * punya implementasi fetch sendiri) — dipertahankan untuk kompatibilitas ke
+ * depan, disamakan skema authnya (Basic, bukan Bearer — lihat komentar di
+ * api/chat/route.ts) supaya kalau dipakai nanti tidak jebak lagi.
  */
 export async function directChat(
   agentId: string,
@@ -87,11 +92,12 @@ export async function directChat(
   stream: boolean
 ): Promise<Response> {
   const token = process.env.GATEWAY_TOKEN || ''
+  const basicAuth = 'Basic ' + Buffer.from(`:${token}`).toString('base64')
 
   return fetch(`${GATEWAY_URL}/v1/chat/completions`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': basicAuth,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
