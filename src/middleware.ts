@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { verifySessionCookie } from '@/lib/auth-server'
-
-const AUTH_COOKIE = 'zd_session'
+import { verifySessionToken, AUTH_COOKIE } from '@/lib/auth-server'
 
 // Routes that don't need auth
 const PUBLIC_ROUTES = ['/login', '/api/login']
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Allow public routes + static files
@@ -21,7 +19,7 @@ export function middleware(request: NextRequest) {
 
   // Check session cookie
   const cookie = request.cookies.get(AUTH_COOKIE)?.value
-  if (!cookie || !verifySessionCookie(cookie)) {
+  if (!cookie || !(await verifySessionToken(cookie))) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(loginUrl)

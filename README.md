@@ -16,6 +16,8 @@ npm run dev
 |---|---|---|---|
 | `GATEWAY_URL` | ✅ | `http://localhost:18789` | OpenClaw Gateway URL |
 | `GATEWAY_TOKEN` | ✅ | — | Bearer token (server-side only) |
+| `DASHBOARD_PASSWORD` | ✅ | — | Password login dashboard, tidak ada default |
+| `SESSION_SECRET` | ✅ | — | Secret tanda tangan session JWT, buat sendiri (`openssl rand -hex 32`) |
 
 ## Deploy
 

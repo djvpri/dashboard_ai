@@ -1,33 +1,57 @@
-const AUTH_COOKIE = 'zd_session'
-const AUTH_PASSWORD = process.env.DASHBOARD_PASSWORD || 'admin123'
+import { SignJWT, jwtVerify } from 'jose'
+
+export const AUTH_COOKIE = 'zd_session'
+const MAX_AGE_DETIK = 60 * 60 * 24 * 3 // 3 hari, sama seperti sebelumnya
+
+// Tidak ada fallback hardcode — kalau env belum di-set, lempar error yang
+// jelas saat dipakai (fail-closed), bukan diam-diam terlindungi password
+// tebakan umum seperti 'admin123'.
+function required(name: string): string {
+  const v = process.env[name]
+  if (!v) throw new Error(`${name} belum di-set di environment.`)
+  return v
+}
+
+export function getAuthPassword(): string {
+  return required('DASHBOARD_PASSWORD')
+}
+
+// Secret KHUSUS untuk menandatangani session token — terpisah dari
+// password login, supaya kebocoran satu tidak otomatis membuka yang lain.
+function sessionSecretBytes(): Uint8Array {
+  return new TextEncoder().encode(required('SESSION_SECRET'))
+}
 
 export function verifyPassword(password: string): boolean {
-  return password === AUTH_PASSWORD
-}
-
-export function generateSessionCookie(): string {
-  const payload = Buffer.from(`${Date.now()}:${hash(AUTH_PASSWORD)}`).toString('base64')
-  return `${AUTH_COOKIE}=${payload}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 3}`
-}
-
-export function verifySessionCookie(cookieValue: string): boolean {
   try {
-    const decoded = Buffer.from(cookieValue, 'base64').toString('utf-8')
-    const [ts, h] = decoded.split(':')
-    const expectedHash = hash(AUTH_PASSWORD)
-    if (h !== expectedHash) return false
-    const age = Date.now() - parseInt(ts)
-    return age < 3 * 24 * 60 * 60 * 1000
+    return password === getAuthPassword()
+  } catch {
+    return false // password belum dikonfigurasi -> tolak semua login
+  }
+}
+
+// Token acak sungguhan per-login (JWT bertanda tangan), BUKAN hash
+// deterministik dari password seperti sebelumnya — dua login dengan
+// password yang sama akan menghasilkan token BERBEDA tiap kali (karena
+// timestamp masuk ke signature yang diverifikasi kriptografis, bukan
+// cuma disertakan mentah di payload yang bisa dipalsukan).
+export async function generateSessionToken(): Promise<string> {
+  return await new SignJWT({ auth: true })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(`${MAX_AGE_DETIK}s`)
+    .sign(sessionSecretBytes())
+}
+
+export function sessionCookieHeader(token: string): string {
+  return `${AUTH_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${MAX_AGE_DETIK}`
+}
+
+export async function verifySessionToken(token: string): Promise<boolean> {
+  try {
+    await jwtVerify(token, sessionSecretBytes())
+    return true
   } catch {
     return false
   }
-}
-
-function hash(s: string): string {
-  let h = 0
-  for (let i = 0; i < s.length; i++) {
-    h = ((h << 5) - h) + s.charCodeAt(i)
-    h = h & h
-  }
-  return h.toString(36)
 }
