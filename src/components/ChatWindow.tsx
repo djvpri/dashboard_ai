@@ -61,15 +61,12 @@ export default function ChatWindow({ agent }: ChatWindowProps) {
     setStreamingContent('')
 
     try {
-      let full = ''
-      await sendMessage(
-        agent.id,
-        updated,
-        (chunk) => {
-          full += chunk
-          setStreamingContent(full)
-        }
-      )
+      // Streaming (stream: true) sementara dinonaktifkan — gateway
+      // OpenClaw menunjukkan kegagalan spesifik terkait mode streaming
+      // ("Streaming response failed" di log) yang berujung socket
+      // hang up / ECONNRESET di proxy. Tanpa streaming, balasan tetap
+      // didapat utuh, cuma tidak muncul kata-per-kata secara bertahap.
+      const full = await sendMessage(agent.id, updated)
       setMessages((prev) => [...prev, { role: 'assistant', content: full }])
       setStreamingContent('')
     } catch (err: any) {
