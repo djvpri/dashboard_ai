@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server'
 import { getAgent } from '@/lib/agents'
 
-const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:18789'
-const GATEWAY_TOKEN = process.env.GATEWAY_TOKEN || ''
+const GATEWAY_URL = (process.env.GATEWAY_URL || 'http://localhost:18789').trim().replace(/\/+$/, '')
+const GATEWAY_TOKEN = (process.env.GATEWAY_TOKEN || '').trim()
 // clawdbot-railway-template memberi /v1/* jalur auth SENDIRI (Bearer +
 // OPENCLAW_GATEWAY_TOKEN), terpisah dari Basic Auth dashboard-nya —
 // GATEWAY_TOKEN di sini harus SAMA dengan OPENCLAW_GATEWAY_TOKEN di sisi
