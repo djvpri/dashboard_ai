@@ -22,8 +22,8 @@ export interface ChatCompletionResponse {
   }
 }
 
-const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || 'http://localhost:18789'
-const GATEWAY_TOKEN = process.env.NEXT_PUBLIC_GATEWAY_TOKEN || ''
+const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:18789'
+const GATEWAY_TOKEN = process.env.GATEWAY_TOKEN || ''
 
 /**
  * Proxy chat request through Next.js API (token stays server-side)

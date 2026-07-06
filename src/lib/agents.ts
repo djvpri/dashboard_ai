@@ -13,7 +13,7 @@ export const agents: Agent[] = [
     name: 'Ojamet',
     emoji: '🦾',
     description: 'Asisten utama — serba bisa',
-    model: '9router/OJAMET',
+    model: 'openrouter/OJAMET',
     color: '#6366f1',
   },
   {
