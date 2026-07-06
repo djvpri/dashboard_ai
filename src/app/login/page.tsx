@@ -1,0 +1,65 @@
+'use client'
+
+import { useState, FormEvent } from 'react'
+import { useRouter } from 'next/navigation'
+
+export default function LoginPage() {
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const router = useRouter()
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        setError(data.error || 'Login gagal')
+        return
+      }
+      router.push('/')
+      router.refresh()
+    } catch {
+      setError('Gagal terhubung ke server')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-zinc-950">
+      <div className="w-full max-w-sm">
+        <form onSubmit={handleSubmit} className="bg-zinc-900 rounded-2xl p-8 border border-zinc-800 space-y-6">
+          <div className="text-center">
+            <h1 className="text-3xl mb-1">🔐</h1>
+            <h2 className="text-xl font-semibold text-white">Z-Dashboard</h2>
+            <p className="text-sm text-zinc-500 mt-1">Masukkan password</p>
+          </div>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            autoFocus
+            className="w-full bg-zinc-800 text-white rounded-xl px-4 py-2.5 text-sm placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+          <button
+            type="submit"
+            disabled={loading || !password}
+            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-700 text-white rounded-xl py-2.5 transition-colors"
+          >
+            {loading ? '...' : 'Masuk'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
