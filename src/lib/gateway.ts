@@ -83,8 +83,9 @@ export async function sendMessage(
  *
  * NOTE: saat ini tidak dipanggil dari mana pun di codebase (api/chat/route.ts
  * punya implementasi fetch sendiri) — dipertahankan untuk kompatibilitas ke
- * depan, disamakan skema authnya (Basic, bukan Bearer — lihat komentar di
- * api/chat/route.ts) supaya kalau dipakai nanti tidak jebak lagi.
+ * depan. GATEWAY_TOKEN harus sama dengan OPENCLAW_GATEWAY_TOKEN di sisi
+ * clawdbot-railway-template (jalur /v1/* punya auth Bearer sendiri,
+ * terpisah dari Basic Auth dashboard-nya).
  */
 export async function directChat(
   agentId: string,
@@ -92,12 +93,11 @@ export async function directChat(
   stream: boolean
 ): Promise<Response> {
   const token = process.env.GATEWAY_TOKEN || ''
-  const basicAuth = 'Basic ' + Buffer.from(`:${token}`).toString('base64')
 
   return fetch(`${GATEWAY_URL}/v1/chat/completions`, {
     method: 'POST',
     headers: {
-      'Authorization': basicAuth,
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
