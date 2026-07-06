@@ -52,7 +52,8 @@ export async function POST(req: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
     })
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    const detail = err?.cause?.message || err?.cause?.code || String(err?.cause || '')
+    return new Response(JSON.stringify({ error: err.message, detail, gatewayUrl: GATEWAY_URL }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     })
