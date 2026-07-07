@@ -15,6 +15,17 @@ export default function Sidebar() {
 
   return (
     <>
+      {/* Mobile hamburger button - only when sidebar is closed */}
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          className="lg:hidden fixed top-4 left-4 z-30 p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white shadow-lg"
+          aria-label="Buka sidebar"
+        >
+          ☰
+        </button>
+      )}
+
       {/* Mobile drawer overlay */}
       {open && (
         <div
