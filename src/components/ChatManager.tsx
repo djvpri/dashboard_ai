@@ -24,13 +24,12 @@ export default function ChatManager({ agents, activeId, onCloseTab }: ChatManage
 
   const activeAgent = useMemo(() => agents.find(a => a.id === activeId), [agents, activeId])
 
-  // If active agent was closed, switch to first available
   if (!activeAgent) {
-    return null // Parent handles fallback
+    return null
   }
 
   return (
-    <div className="relative flex-1 overflow-hidden">
+    <div className="flex-1 overflow-hidden relative">
       {agents.map((agent) => {
         const isActive = agent.id === activeId
         const isMounted = mountedAgents.has(agent.id)
@@ -41,14 +40,9 @@ export default function ChatManager({ agents, activeId, onCloseTab }: ChatManage
           <div
             key={agent.id}
             className={cn(
-              'absolute inset-0 flex flex-col',
-              isActive ? 'block z-10' : 'hidden z-0'
+              'h-full flex flex-col',
+              isActive ? 'block' : 'hidden'
             )}
-            style={{ 
-              opacity: isActive ? 1 : 0,
-              pointerEvents: isActive ? 'auto' : 'none',
-              transition: 'opacity 150ms ease'
-            }}
             role="tabpanel"
             aria-labelledby={`tab-${agent.id}`}
           >
@@ -56,13 +50,6 @@ export default function ChatManager({ agents, activeId, onCloseTab }: ChatManage
           </div>
         )
       })}
-
-      {/* No active agent fallback */}
-      {!activeAgent && (
-        <div className="flex-1 flex items-center justify-center text-zinc-500">
-          <p>No active chat. Select an agent or create new.</p>
-        </div>
-      )}
     </div>
   )
 }
