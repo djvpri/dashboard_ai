@@ -158,8 +158,12 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
         hasImages ? pastedImages : undefined,
         agentDasar.backend // undefined untuk agent bawaan, 'openclaw'/'hermes' untuk agent kustom
       )
-      setMessages((prev) => [...prev, { role: 'assistant', content: full }])
       setStreamingContent('')
+      // Hanya simpan kalau ada isi — respons kosong (gateway timeout,
+      // streaming gagal, dll) tidak boleh menghasilkan bubble kosong
+      if (full.trim()) {
+        setMessages((prev) => [...prev, { role: 'assistant', content: full }])
+      }
     } catch (err) {
       const pesan = err instanceof Error ? err.message : String(err)
       setMessages((prev) => [
@@ -208,7 +212,12 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-hide">
-        {messages.map((msg, i) => {
+        {messages.filter(msg => {
+          if (msg.role === 'user') return true
+          const c = msg.content
+          const teks = typeof c === 'string' ? c : (Array.isArray(c) ? (c as {type:string;text?:string}[]).find(p=>p.type==='text')?.text || '' : '')
+          return teks.trim() !== ''
+        }).map((msg, i) => {
           const { text, images } = extractContent(msg.content)
           return (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
