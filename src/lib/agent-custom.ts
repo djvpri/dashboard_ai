@@ -1,19 +1,16 @@
 'use client'
 
 // Kustomisasi agent (nama, emoji, deskripsi/spesialisasi, system prompt)
-// disimpan di localStorage — konsisten dengan pola riwayat chat yang sudah
-// ada di app ini, tanpa perlu database. Konsekuensinya sama dengan riwayat:
-// per-browser (ganti perangkat = kembali default), tapi untuk dashboard
-// pribadi satu pengguna itu trade-off yang wajar.
+// disimpan di server (Postgres, lewat /api/agent-custom) — tersinkron
+// lintas browser/perangkat, bukan lagi per-browser seperti versi
+// localStorage sebelumnya.
 //
 // Yang SENGAJA tidak bisa dikustomisasi: routing backend (id 'main' ->
 // OpenClaw, id 'hermes' -> hermes-agent) — itu infrastruktur di sisi
 // server (api/chat/route.ts), bukan kosmetik.
 
-import { useSyncExternalStore } from 'react'
+import { useState, useEffect } from 'react'
 import { Agent, agents, getAgent } from './agents'
-
-const CUSTOM_KEY = 'zd_agent_custom_'
 
 export interface AgentCustom {
   name?: string
@@ -22,124 +19,132 @@ export interface AgentCustom {
   systemPrompt?: string
 }
 
-// ===== penyimpanan =====
+const EVENT = 'zd-agent-custom-changed'
 
-function bacaCustom(agentId: string): AgentCustom {
-  if (typeof window === 'undefined') return {}
-  try {
-    const raw = localStorage.getItem(CUSTOM_KEY + agentId)
-    if (raw) return JSON.parse(raw)
-  } catch {}
-  return {}
+// Cache in-memory per sesi browser (bukan localStorage) — dihuni setelah
+// fetch pertama, dibaca komponen lain tanpa fetch berulang dalam load yang
+// sama. Sumber kebenaran tetap server; cache ini murni optimisasi.
+const cache = new Map<string, AgentCustom>()
+let sudahFetchSemua = false
+
+function dariItem(item: {
+  name?: string; emoji?: string; description?: string; systemPrompt?: string
+}): AgentCustom {
+  return {
+    name: item.name || undefined,
+    emoji: item.emoji || undefined,
+    description: item.description || undefined,
+    systemPrompt: item.systemPrompt || undefined,
+  }
 }
 
-export function simpanCustom(agentId: string, data: AgentCustom) {
+async function fetchSatu(agentId: string): Promise<AgentCustom> {
+  try {
+    const res = await fetch(`/api/agent-custom?agentId=${agentId}`)
+    const data = await res.json()
+    const custom = data.items?.[0] ? dariItem(data.items[0]) : {}
+    cache.set(agentId, custom)
+    return custom
+  } catch {
+    return cache.get(agentId) ?? {}
+  }
+}
+
+async function fetchSemua(): Promise<void> {
+  if (sudahFetchSemua) return
+  try {
+    const res = await fetch('/api/agent-custom')
+    const data = await res.json()
+    for (const item of data.items ?? []) {
+      cache.set(item.agentId, dariItem(item))
+    }
+    sudahFetchSemua = true
+  } catch {
+    // Biarkan sudahFetchSemua tetap false -> percobaan berikutnya coba lagi.
+  }
+}
+
+function umumkanPerubahan() {
+  window.dispatchEvent(new Event(EVENT))
+}
+
+export async function simpanCustom(agentId: string, data: AgentCustom): Promise<void> {
   const bersih: AgentCustom = {}
   if (data.name?.trim()) bersih.name = data.name.trim()
   if (data.emoji?.trim()) bersih.emoji = data.emoji.trim()
   if (data.description?.trim()) bersih.description = data.description.trim()
   if (data.systemPrompt?.trim()) bersih.systemPrompt = data.systemPrompt.trim()
 
-  try {
-    if (Object.keys(bersih).length === 0) {
-      localStorage.removeItem(CUSTOM_KEY + agentId)
-    } else {
-      localStorage.setItem(CUSTOM_KEY + agentId, JSON.stringify(bersih))
-    }
-  } catch {}
+  await fetch('/api/agent-custom', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agentId, ...bersih }),
+  })
+  cache.set(agentId, bersih)
   umumkanPerubahan()
 }
 
-export function resetCustom(agentId: string) {
-  try {
-    localStorage.removeItem(CUSTOM_KEY + agentId)
-  } catch {}
+export async function resetCustom(agentId: string): Promise<void> {
+  await fetch(`/api/agent-custom?agentId=${agentId}`, { method: 'DELETE' })
+  cache.delete(agentId)
   umumkanPerubahan()
 }
 
-// ===== reaktivitas (supaya Sidebar & ChatWindow ikut berubah seketika) =====
-
-const EVENT = 'zd-agent-custom-changed'
-
-function umumkanPerubahan() {
-  window.dispatchEvent(new Event(EVENT))
-}
-
-// ===== gabungan default + kustom =====
-
-export function gabungkanAgent(dasar: Agent): Agent {
-  const custom = bacaCustom(dasar.id)
+export function gabungkanAgent(dasar: Agent, custom: AgentCustom): Agent {
   return { ...dasar, ...custom }
 }
 
-// ===== store untuk useSyncExternalStore =====
-// Snapshot HARUS mengembalikan referensi yang stabil di antara perubahan
-// (kalau tidak, React re-render tanpa henti) — makanya hasil gabungan
-// di-cache dan cache dibatalkan saat ada perubahan.
-//
-// Hydration-safe: saat hydration React memakai snapshot SERVER (default
-// murni, sama dengan HTML server) lalu setelah mount otomatis membaca
-// snapshot client (dengan kustomisasi) dan re-render kalau berbeda —
-// tidak ada hydration mismatch, tanpa perlu setState manual di effect.
-
-let cacheSemua: Agent[] | null = null
-const cacheSatu = new Map<string, Agent>()
-
-function batalkanCache() {
-  cacheSemua = null
-  cacheSatu.clear()
-}
-
-function subscribe(cb: () => void) {
-  const wrapper = () => {
-    batalkanCache()
-    cb()
-  }
-  window.addEventListener(EVENT, wrapper)
-  // storage event menangkap perubahan dari tab lain
-  window.addEventListener('storage', wrapper)
-  return () => {
-    window.removeEventListener(EVENT, wrapper)
-    window.removeEventListener('storage', wrapper)
-  }
-}
-
-function snapshotSemua(): Agent[] {
-  if (!cacheSemua) cacheSemua = agents.map(gabungkanAgent)
-  return cacheSemua
-}
-
-function snapshotSemuaServer(): Agent[] {
-  return agents // konstanta modul — referensi stabil
-}
-
-function snapshotSatu(agentId: string): Agent | undefined {
-  const dasar = getAgent(agentId)
-  if (!dasar) return undefined
-  let hasil = cacheSatu.get(agentId)
-  if (!hasil) {
-    hasil = gabungkanAgent(dasar)
-    cacheSatu.set(agentId, hasil)
-  }
-  return hasil
-}
-
-// Hook: agent tunggal dengan kustomisasi diterapkan, reaktif terhadap
-// perubahan (dari modal edit maupun tab lain via storage event).
+// Hook: agent tunggal dengan kustomisasi diterapkan.
+// useEffect+useState di sini SESUAI (bukan pelanggaran pola) — ini benar-
+// benar async data fetching dari server, beda dengan versi localStorage
+// sebelumnya yang synchronous (di situ useSyncExternalStore yang tepat).
 export function useAgentTampil(agentId: string): Agent | undefined {
-  return useSyncExternalStore(
-    subscribe,
-    () => snapshotSatu(agentId),
-    () => getAgent(agentId)
-  )
+  const dasar = getAgent(agentId)
+  const [custom, setCustom] = useState<AgentCustom>(() => cache.get(agentId) ?? {})
+
+  useEffect(() => {
+    let batal = false
+    fetchSatu(agentId).then((c) => { if (!batal) setCustom(c) })
+    const perbarui = () => setCustom(cache.get(agentId) ?? {})
+    window.addEventListener(EVENT, perbarui)
+    return () => {
+      batal = true
+      window.removeEventListener(EVENT, perbarui)
+    }
+  }, [agentId])
+
+  if (!dasar) return undefined
+  return gabungkanAgent(dasar, custom)
 }
 
-// Hook: semua agent dengan kustomisasi diterapkan.
+// Hook: semua agent dengan kustomisasi diterapkan (dipakai Sidebar).
 export function useSemuaAgentTampil(): Agent[] {
-  return useSyncExternalStore(subscribe, snapshotSemua, snapshotSemuaServer)
+  const [, setTick] = useState(0)
+
+  useEffect(() => {
+    let batal = false
+    fetchSemua().then(() => { if (!batal) setTick((t) => t + 1) })
+    const perbarui = () => setTick((t) => t + 1)
+    window.addEventListener(EVENT, perbarui)
+    return () => {
+      batal = true
+      window.removeEventListener(EVENT, perbarui)
+    }
+  }, [])
+
+  return agents.map((a) => gabungkanAgent(a, cache.get(a.id) ?? {}))
 }
 
-// Ambil kustomisasi mentah (untuk isi awal form edit).
-export function ambilCustom(agentId: string): AgentCustom {
-  return bacaCustom(agentId)
+// Nilai FRESH langsung dari server (bukan cache) — dipakai AgentEditModal
+// saat dibuka, supaya form terisi data terbaru meski diedit dari
+// perangkat lain sebelumnya.
+export async function ambilCustomFresh(agentId: string): Promise<AgentCustom> {
+  return fetchSatu(agentId)
+}
+
+// Ambil dari cache saja (sinkron) — dipakai ChatWindow saat kirim pesan,
+// tidak perlu fetch ulang tiap kirim karena useAgentTampil di komponen yang
+// sama sudah pasti mengisi cache lebih dulu.
+export function ambilCustomCache(agentId: string): AgentCustom {
+  return cache.get(agentId) ?? {}
 }

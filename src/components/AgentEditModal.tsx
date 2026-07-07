@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Agent, getAgent } from '@/lib/agents'
-import { ambilCustom, simpanCustom, resetCustom } from '@/lib/agent-custom'
+import { ambilCustomFresh, simpanCustom, resetCustom } from '@/lib/agent-custom'
 
 interface Props {
   agentId: string
@@ -11,37 +11,60 @@ interface Props {
 
 export default function AgentEditModal({ agentId, onClose }: Props) {
   const dasar: Agent | undefined = getAgent(agentId)
-  // Lazy initializer (bukan useEffect): modal ini selalu di-mount baru
-  // setiap kali dibuka (dirender kondisional oleh Sidebar), jadi nilai
-  // awal form cukup dibaca sekali saat mount.
-  const [name, setName] = useState(() => ambilCustom(agentId).name ?? dasar?.name ?? '')
-  const [emoji, setEmoji] = useState(() => ambilCustom(agentId).emoji ?? dasar?.emoji ?? '')
-  const [description, setDescription] = useState(
-    () => ambilCustom(agentId).description ?? dasar?.description ?? ''
-  )
-  const [systemPrompt, setSystemPrompt] = useState(
-    () => ambilCustom(agentId).systemPrompt ?? dasar?.systemPrompt ?? ''
-  )
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [name, setName] = useState('')
+  const [emoji, setEmoji] = useState('')
+  const [description, setDescription] = useState('')
+  const [systemPrompt, setSystemPrompt] = useState('')
+
+  // Nilai FRESH dari server tiap modal dibuka — bukan cache — supaya form
+  // terisi data terbaru meski diedit dari perangkat lain sebelumnya.
+  useEffect(() => {
+    if (!dasar) return
+    let batal = false
+    setLoading(true)
+    ambilCustomFresh(agentId).then((custom) => {
+      if (batal) return
+      setName(custom.name ?? dasar.name)
+      setEmoji(custom.emoji ?? dasar.emoji)
+      setDescription(custom.description ?? dasar.description)
+      setSystemPrompt(custom.systemPrompt ?? dasar.systemPrompt)
+      setLoading(false)
+    })
+    return () => { batal = true }
+  }, [agentId, dasar])
 
   if (!dasar) return null
 
-  function simpan() {
+  async function simpan() {
     if (!dasar) return
-    // Nilai yang sama dengan default tidak perlu disimpan sebagai kustom —
-    // biar reset default resmi (kalau nanti diubah di kode) tetap mengalir.
-    simpanCustom(agentId, {
-      name: name !== dasar.name ? name : undefined,
-      emoji: emoji !== dasar.emoji ? emoji : undefined,
-      description: description !== dasar.description ? description : undefined,
-      systemPrompt: systemPrompt !== dasar.systemPrompt ? systemPrompt : undefined,
-    })
-    onClose()
+    setSaving(true)
+    try {
+      // Nilai yang sama dengan default tidak perlu disimpan sebagai kustom
+      // — biar reset default resmi (kalau nanti diubah di kode) tetap
+      // mengalir ke yang belum mengkustomisasi field itu.
+      await simpanCustom(agentId, {
+        name: name !== dasar.name ? name : undefined,
+        emoji: emoji !== dasar.emoji ? emoji : undefined,
+        description: description !== dasar.description ? description : undefined,
+        systemPrompt: systemPrompt !== dasar.systemPrompt ? systemPrompt : undefined,
+      })
+      onClose()
+    } finally {
+      setSaving(false)
+    }
   }
 
-  function kembalikanDefault() {
+  async function kembalikanDefault() {
     if (!confirm('Kembalikan agent ini ke pengaturan bawaan?')) return
-    resetCustom(agentId)
-    onClose()
+    setSaving(true)
+    try {
+      await resetCustom(agentId)
+      onClose()
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -58,74 +81,83 @@ export default function AgentEditModal({ agentId, onClose }: Props) {
           <button onClick={onClose} className="text-zinc-500 hover:text-white text-xl leading-none">×</button>
         </div>
 
-        <div className="flex gap-3">
-          <div className="w-20">
-            <label className="text-xs text-zinc-400 block mb-1">Emoji</label>
-            <input
-              value={emoji}
-              onChange={(e) => setEmoji(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-center text-lg outline-none focus:border-indigo-500"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="text-xs text-zinc-400 block mb-1">Nama</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
-            />
-          </div>
-        </div>
+        {loading ? (
+          <div className="py-8 text-center text-sm text-zinc-500">Memuat...</div>
+        ) : (
+          <>
+            <div className="flex gap-3">
+              <div className="w-20">
+                <label className="text-xs text-zinc-400 block mb-1">Emoji</label>
+                <input
+                  value={emoji}
+                  onChange={(e) => setEmoji(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-center text-lg outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-zinc-400 block mb-1">Nama</label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
 
-        <div>
-          <label className="text-xs text-zinc-400 block mb-1">Spesialisasi (deskripsi singkat)</label>
-          <input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="mis. Coding & eksperimen"
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
-          />
-        </div>
+            <div>
+              <label className="text-xs text-zinc-400 block mb-1">Spesialisasi (deskripsi singkat)</label>
+              <input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="mis. Coding & eksperimen"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+              />
+            </div>
 
-        <div>
-          <label className="text-xs text-zinc-400 block mb-1">
-            System prompt (kepribadian & keahlian — dikirim setiap chat)
-          </label>
-          <textarea
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
-            rows={6}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500 resize-y"
-          />
-        </div>
+            <div>
+              <label className="text-xs text-zinc-400 block mb-1">
+                System prompt (kepribadian & keahlian — dikirim setiap chat)
+              </label>
+              <textarea
+                value={systemPrompt}
+                onChange={(e) => setSystemPrompt(e.target.value)}
+                rows={6}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500 resize-y"
+              />
+            </div>
 
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <button
-            onClick={kembalikanDefault}
-            className="text-xs text-zinc-500 hover:text-red-400 transition-colors"
-          >
-            Kembalikan ke default
-          </button>
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
-            >
-              Batal
-            </button>
-            <button
-              onClick={simpan}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition-colors"
-            >
-              Simpan
-            </button>
-          </div>
-        </div>
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <button
+                onClick={kembalikanDefault}
+                disabled={saving}
+                className="text-xs text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50"
+              >
+                Kembalikan ke default
+              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={onClose}
+                  disabled={saving}
+                  className="px-4 py-2 rounded-lg text-sm text-zinc-300 hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={simpan}
+                  disabled={saving}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Menyimpan...' : 'Simpan'}
+                </button>
+              </div>
+            </div>
 
-        <p className="text-[11px] text-zinc-600 leading-relaxed">
-          Tersimpan di browser ini saja (seperti riwayat chat). Backend tiap agent
-          (Ojamet → OpenClaw, Hermes → hermes-agent) tidak berubah dari sini.
-        </p>
+            <p className="text-[11px] text-zinc-600 leading-relaxed">
+              Tersimpan di server — sinkron di semua browser/perangkat. Backend tiap agent
+              (Ojamet → OpenClaw, Hermes → hermes-agent) tidak berubah dari sini.
+            </p>
+          </>
+        )}
       </div>
     </div>
   )

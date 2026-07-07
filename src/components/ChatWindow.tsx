@@ -3,23 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { sendMessage, ChatMessage, ContentPart } from '@/lib/gateway'
 import { Agent } from '@/lib/agents'
-import { useAgentTampil, ambilCustom } from '@/lib/agent-custom'
-
-const STORAGE_KEY = 'zd_chat_'
-
-function loadHistory(agentId: string): ChatMessage[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY + agentId)
-    if (raw) return JSON.parse(raw)
-  } catch {}
-  return []
-}
-
-function saveHistory(agentId: string, msgs: ChatMessage[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY + agentId, JSON.stringify(msgs))
-  } catch {}
-}
+import { useAgentTampil, ambilCustomCache } from '@/lib/agent-custom'
 
 interface ChatWindowProps {
   agent: Agent
@@ -37,15 +21,16 @@ function extractContent(
   return { text, images }
 }
 
+function pesanSapaan(nama: string): ChatMessage {
+  return { role: 'assistant', content: `Halo! Aku **${nama}**. Ada yang bisa dibantu?` }
+}
+
 export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
-  // Tampilan (nama/emoji/deskripsi) memakai versi kustom dari localStorage;
+  // Tampilan (nama/emoji/deskripsi) memakai versi kustom dari server;
   // agentDasar.id tetap dipakai untuk riwayat & routing backend.
   const agent: Agent = useAgentTampil(agentDasar.id) ?? agentDasar
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    const saved = loadHistory(agentDasar.id)
-    if (saved.length > 0) return saved
-    return [{ role: 'assistant', content: `Halo! Aku **${agentDasar.name}**. Ada yang bisa dibantu?` }]
-  })
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [pesanSapaan(agentDasar.name)])
+  const [historyLoaded, setHistoryLoaded] = useState(false)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
@@ -54,10 +39,33 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Persist on change
+  // Riwayat sekarang disimpan di server (Postgres), tersinkron lintas
+  // browser/perangkat — bukan lagi localStorage per-browser.
   useEffect(() => {
-    saveHistory(agentDasar.id, messages)
-  }, [agentDasar.id, messages])
+    let batal = false
+    setHistoryLoaded(false)
+    fetch(`/api/history?agentId=${agentDasar.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (batal) return
+        setMessages(data.messages?.length > 0 ? data.messages : [pesanSapaan(agentDasar.name)])
+        setHistoryLoaded(true)
+      })
+      .catch(() => { if (!batal) setHistoryLoaded(true) })
+    return () => { batal = true }
+  }, [agentDasar.id, agentDasar.name])
+
+  // Simpan ke server tiap kali riwayat berubah — TAPI hanya setelah fetch
+  // awal selesai (historyLoaded), supaya sapaan sementara di render
+  // pertama tidak keburu menimpa riwayat asli sebelum sempat dimuat.
+  useEffect(() => {
+    if (!historyLoaded) return
+    fetch('/api/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agentId: agentDasar.id, messages }),
+    }).catch(() => {})
+  }, [agentDasar.id, messages, historyLoaded])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -86,14 +94,15 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
       if (item.type.startsWith('image/')) {
-        imageFiles.push(item.getAsFile()!)
+        const f = item.getAsFile()
+        if (f) imageFiles.push(f)
       }
     }
 
-    if (imageFiles.length === 0 || imageFiles.some((f) => !f)) return
+    if (imageFiles.length === 0) return
 
     e.preventDefault()
-    const urls = await Promise.all(imageFiles.filter(Boolean).map(fileToDataURL))
+    const urls = await Promise.all(imageFiles.map(fileToDataURL))
     setPastedImages((prev) => [...prev, ...urls])
   }, [])
 
@@ -120,17 +129,16 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
 
     // Build user message content
     const hasImages = pastedImages.length > 0
-    let userContent: string | ContentPart[] = text
-    if (hasImages) {
-      userContent = [
-        { type: 'text', text },
-        ...pastedImages.map((img) => ({ type: 'image_url' as const, image_url: { url: img } })),
-      ]
-    }
+    const userContent: string | ContentPart[] = hasImages
+      ? [
+          { type: 'text', text },
+          ...pastedImages.map((img) => ({ type: 'image_url' as const, image_url: { url: img } })),
+        ]
+      : text
 
-    const userMsg: ChatMessage = { role: 'user', content: userContent } as any
+    const userMsg: ChatMessage = { role: 'user', content: userContent as ChatMessage['content'] }
     const updated = [...messages, userMsg]
-    setMessages(updated as ChatMessage[])
+    setMessages(updated)
     setInput('')
     setPastedImages([])
     setLoading(true)
@@ -138,10 +146,10 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
 
     try {
       let full = ''
-      // System prompt kustom (kalau ada) dikirim sebagai override —
-      // dibaca langsung dari localStorage saat kirim, bukan dari state,
-      // supaya selalu nilai terbaru meski baru saja diedit.
-      const custom = ambilCustom(agentDasar.id)
+      // System prompt kustom (kalau ada) dikirim sebagai override — dibaca
+      // dari cache in-memory (sudah diisi oleh useAgentTampil di komponen
+      // ini), bukan fetch ulang tiap kirim.
+      const custom = ambilCustomCache(agentDasar.id)
       await sendMessage(
         agentDasar.id,
         updated,
@@ -173,8 +181,10 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
   }
 
   const clearHistory = () => {
-    localStorage.removeItem(STORAGE_KEY + agentDasar.id)
-    setMessages([{ role: 'assistant', content: `Halo! Aku **${agent.name}**. Ada yang bisa dibantu?` }])
+    const sapaan = [pesanSapaan(agent.name)]
+    setMessages(sapaan)
+    // historyLoaded sudah true di titik ini (tombol cuma tampil setelah
+    // chat termuat), jadi effect persist di atas otomatis menyimpan ini.
   }
 
   return (
