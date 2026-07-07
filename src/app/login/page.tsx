@@ -24,7 +24,12 @@ export default function LoginPage() {
         setError(data.error || 'Login gagal')
         return
       }
-      router.push('/')
+      // Redirect ke halaman yang diminta sebelumnya (kalau ada), atau
+      // langsung ke chat — jangan ke '/' supaya tidak ada landing page yang
+      // muncul sebentar sebelum server redirect ke /chat berjalan.
+      const params = new URLSearchParams(window.location.search)
+      const target = params.get('redirect') || '/chat'
+      router.push(target)
       router.refresh()
     } catch {
       setError('Gagal terhubung ke server')
