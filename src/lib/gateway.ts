@@ -49,7 +49,8 @@ export async function sendMessage(
   messages: ChatMessage[],
   onStream?: (chunk: string) => void,
   systemPrompt?: string,
-  images?: string[] // base64 data URLs
+  images?: string[], // base64 data URLs
+  backend?: string   // 'openclaw' | 'hermes' — untuk agent kustom dari UI
 ): Promise<string> {
   // Build content: if images present, use ContentPart[] array
   const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
@@ -64,9 +65,12 @@ export async function sendMessage(
     )
   }
 
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (backend) headers['x-agent-backend'] = backend
+
   const res = await fetch(`/api/chat?agentId=${agentId}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ messages: bodyMessages, stream: !!onStream, systemPrompt }),
   })
 

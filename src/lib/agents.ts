@@ -7,6 +7,8 @@ export interface Agent {
   color: string
   systemPrompt: string
   toolsets?: string[]
+  isCustom?: boolean   // true kalau dibuat dari UI, bukan agent bawaan
+  backend?: string     // 'openclaw' | 'hermes' — dipakai routing di api/chat
 }
 
 export const agents: Agent[] = [
@@ -37,4 +39,26 @@ export function getAgent(id: string): Agent | undefined {
 
 export function getSystemPrompt(agentId: string): string {
   return getAgent(agentId)?.systemPrompt || ''
+}
+
+// Konversi data agent kustom dari DB ke format Agent yang dipakai komponen
+export function customAgentKeAgent(data: {
+  id: string
+  name: string
+  emoji: string
+  description: string
+  backend: string
+  systemPrompt: string
+}): Agent {
+  return {
+    id: data.id,
+    name: data.name,
+    emoji: data.emoji,
+    description: data.description,
+    model: data.backend === 'hermes' ? 'hermes-agent' : '9router/OJAMET',
+    color: '#8b5cf6',
+    systemPrompt: data.systemPrompt,
+    backend: data.backend,
+    isCustom: true,
+  }
 }

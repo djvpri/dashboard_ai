@@ -146,9 +146,6 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
 
     try {
       let full = ''
-      // System prompt kustom (kalau ada) dikirim sebagai override — dibaca
-      // dari cache in-memory (sudah diisi oleh useAgentTampil di komponen
-      // ini), bukan fetch ulang tiap kirim.
       const custom = ambilCustomCache(agentDasar.id)
       await sendMessage(
         agentDasar.id,
@@ -158,7 +155,8 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
           setStreamingContent(full)
         },
         custom.systemPrompt,
-        hasImages ? pastedImages : undefined
+        hasImages ? pastedImages : undefined,
+        agentDasar.backend // undefined untuk agent bawaan, 'openclaw'/'hermes' untuk agent kustom
       )
       setMessages((prev) => [...prev, { role: 'assistant', content: full }])
       setStreamingContent('')

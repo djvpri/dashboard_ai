@@ -5,25 +5,50 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import ChatTabs from '@/components/ChatTabs'
 import ChatManager from '@/components/ChatManager'
-import { Agent, agents } from '@/lib/agents'
+import NewAgentModal from '@/components/NewAgentModal'
+import { Agent, agents as agentsBawaan, customAgentKeAgent } from '@/lib/agents'
 
-export default function ChatPageClient({ initialAgent, agents: initialAgents }: { initialAgent: Agent; agents: Agent[] }) {
+interface Props {
+  initialAgent: Agent
+  agents: Agent[]
+}
+
+export default function ChatPageClient({ initialAgent, agents: initialAgents }: Props) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [activeId, setActiveId] = useState<string>(initialAgent.id)
-  const [localAgents, setLocalAgents] = useState<Agent[]>(initialAgents)
+  const [allAgents, setAllAgents] = useState<Agent[]>(initialAgents)
+  const [showNewModal, setShowNewModal] = useState(false)
+  // Agent yang sedang di-edit (null = tidak ada)
+  const [editAgent, setEditAgent] = useState<Agent | null>(null)
 
-  // Sync with URL on mount and searchParams changes
+  // Load agent kustom dari DB saat pertama mount
+  useEffect(() => {
+    fetch('/api/agents')
+      .then(r => r.json())
+      .then(data => {
+        if (data.agents?.length > 0) {
+          const kustom: Agent[] = data.agents.map((a: {
+            id: string; name: string; emoji: string
+            description: string; backend: string; systemPrompt: string
+          }) => customAgentKeAgent(a))
+          setAllAgents([...agentsBawaan, ...kustom])
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  // Sync dengan URL
   useEffect(() => {
     const urlAgentId = searchParams.get('agent')
-    if (urlAgentId && urlAgentId !== activeId && localAgents.some(a => a.id === urlAgentId)) {
+    if (urlAgentId && urlAgentId !== activeId && allAgents.some(a => a.id === urlAgentId)) {
       setActiveId(urlAgentId)
     }
-  }, [searchParams, localAgents, activeId])
+  }, [searchParams, allAgents, activeId])
 
   const switchAgent = (id: string) => {
     if (id === 'new') {
-      // TODO: Create new custom agent
+      setShowNewModal(true)
       return
     }
     setActiveId(id)
@@ -31,12 +56,37 @@ export default function ChatPageClient({ initialAgent, agents: initialAgents }: 
   }
 
   const closeTab = (id: string) => {
-    const idx = localAgents.findIndex(a => a.id === id)
+    // Agent bawaan tidak bisa ditutup (hanya dikurangi dari tab jika ada tab kustom)
+    const idx = allAgents.findIndex(a => a.id === id)
     if (idx === -1) return
-    const nextAgents = localAgents.filter(a => a.id !== id)
-    setLocalAgents(nextAgents)
+    const remaining = allAgents.filter(a => a.id !== id)
+    setAllAgents(remaining)
     if (activeId === id) {
-      const nextId = nextAgents[0]?.id || agents[0].id
+      const nextId = remaining[0]?.id || agentsBawaan[0].id
+      setActiveId(nextId)
+      router.push(`/chat?agent=${nextId}`)
+    }
+  }
+
+  // Dipanggil setelah agent baru/editan tersimpan
+  const handleAgentSaved = (agent: Agent) => {
+    setAllAgents(prev => {
+      const sudahAda = prev.findIndex(a => a.id === agent.id)
+      if (sudahAda >= 0) {
+        // Update agent yang sudah ada
+        return prev.map(a => a.id === agent.id ? agent : a)
+      }
+      return [...prev, agent]
+    })
+    setActiveId(agent.id)
+    router.push(`/chat?agent=${agent.id}`)
+  }
+
+  // Dipanggil setelah agent kustom dihapus
+  const handleAgentDeleted = (id: string) => {
+    setAllAgents(prev => prev.filter(a => a.id !== id))
+    if (activeId === id) {
+      const nextId = agentsBawaan[0].id
       setActiveId(nextId)
       router.push(`/chat?agent=${nextId}`)
     }
@@ -44,11 +94,47 @@ export default function ChatPageClient({ initialAgent, agents: initialAgents }: 
 
   return (
     <div className="flex h-screen">
-      <Sidebar activeId={activeId} onSwitchAgent={switchAgent} agents={localAgents} />
+      <Sidebar
+        activeId={activeId}
+        onSwitchAgent={switchAgent}
+        agents={allAgents}
+        onEditAgent={(agent) => setEditAgent(agent)}
+      />
       <div className="flex-1 flex flex-col">
-        <ChatTabs agents={localAgents} activeId={activeId} onSwitch={switchAgent} onClose={closeTab} closable={localAgents.length > 1} />
-        <ChatManager agents={localAgents} activeId={activeId} onCloseTab={closeTab} />
+        <ChatTabs
+          agents={allAgents}
+          activeId={activeId}
+          onSwitch={switchAgent}
+          onClose={closeTab}
+          closable={allAgents.length > 1}
+        />
+        <ChatManager agents={allAgents} activeId={activeId} onCloseTab={closeTab} />
       </div>
+
+      {/* Modal buat agent baru */}
+      {showNewModal && (
+        <NewAgentModal
+          onSave={handleAgentSaved}
+          onClose={() => setShowNewModal(false)}
+        />
+      )}
+
+      {/* Modal edit agent kustom */}
+      {editAgent?.isCustom && (
+        <NewAgentModal
+          initialData={{
+            id: editAgent.id,
+            name: editAgent.name,
+            emoji: editAgent.emoji,
+            description: editAgent.description,
+            backend: editAgent.backend || 'openclaw',
+            systemPrompt: editAgent.systemPrompt,
+          }}
+          onSave={handleAgentSaved}
+          onDelete={handleAgentDeleted}
+          onClose={() => setEditAgent(null)}
+        />
+      )}
     </div>
   )
 }

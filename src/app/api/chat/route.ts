@@ -24,8 +24,12 @@ interface BackendTarget {
 // (termasuk 'Hermes') dijawab gateway OpenClaw yang sama dengan model
 // 9router/OJAMET; 'Hermes' cuma beda system prompt, bukan hermes-agent
 // sungguhan.
-function pilihBackend(agentId: string): BackendTarget | { error: string } {
-  if (agentId === 'hermes') {
+function pilihBackend(agentId: string, backendHint?: string): BackendTarget | { error: string } {
+  // Agent kustom dari UI bisa kasih backend hint ('openclaw' atau 'hermes')
+  // lewat header x-agent-backend dari ChatWindow
+  const backend = backendHint || (agentId === 'hermes' ? 'hermes' : 'openclaw')
+
+  if (backend === 'hermes') {
     if (!HERMES_API_URL || !HERMES_API_KEY) {
       return {
         error:
@@ -41,7 +45,8 @@ function pilihBackend(agentId: string): BackendTarget | { error: string } {
 export async function POST(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const agentId = searchParams.get('agentId') || 'main'
-  const backend = pilihBackend(agentId)
+  const backendHint = req.headers.get('x-agent-backend') || undefined
+  const backend = pilihBackend(agentId, backendHint)
 
   if ('error' in backend) {
     return new Response(JSON.stringify({ error: backend.error }), {
