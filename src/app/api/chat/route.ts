@@ -51,10 +51,17 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { messages, stream } = await req.json()
+    const { messages, stream, systemPrompt: promptKustom } = await req.json()
 
+    // Override system prompt dari kustomisasi agent di sisi client
+    // (localStorage) — aman untuk dashboard pribadi satu pengguna yang
+    // sudah di belakang login; dibatasi panjangnya supaya tidak bisa
+    // dipakai membanjiri context backend secara tidak sengaja.
     const agent = getAgent(agentId)
-    const systemPrompt = agent?.systemPrompt
+    const systemPrompt =
+      typeof promptKustom === 'string' && promptKustom.trim()
+        ? promptKustom.trim().slice(0, 8000)
+        : agent?.systemPrompt
 
     // Inject system prompt as first message
     const msgs = systemPrompt
@@ -94,9 +101,10 @@ export async function POST(req: NextRequest) {
     return new Response(JSON.stringify(data), {
       headers: { 'Content-Type': 'application/json' },
     })
-  } catch (err: any) {
-    const detail = err?.cause?.message || err?.cause?.code || String(err?.cause || '')
-    return new Response(JSON.stringify({ error: err.message, detail, backend: backend.label, url: backend.url }), {
+  } catch (err) {
+    const e = err as Error & { cause?: { message?: string; code?: string } }
+    const detail = e?.cause?.message || e?.cause?.code || String(e?.cause || '')
+    return new Response(JSON.stringify({ error: e.message, detail, backend: backend.label, url: backend.url }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     })

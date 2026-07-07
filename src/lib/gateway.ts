@@ -27,16 +27,20 @@ const GATEWAY_TOKEN = (process.env.GATEWAY_TOKEN || '').trim()
 
 /**
  * Proxy chat request through Next.js API (token stays server-side)
+ *
+ * systemPrompt opsional: override dari kustomisasi agent (localStorage) —
+ * kalau tidak dikirim, server pakai default dari lib/agents.ts.
  */
 export async function sendMessage(
   agentId: string,
   messages: ChatMessage[],
-  onStream?: (chunk: string) => void
+  onStream?: (chunk: string) => void,
+  systemPrompt?: string
 ): Promise<string> {
   const res = await fetch(`/api/chat?agentId=${agentId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, stream: !!onStream }),
+    body: JSON.stringify({ messages, stream: !!onStream, systemPrompt }),
   })
 
   if (!res.ok) {

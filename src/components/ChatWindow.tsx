@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { sendMessage, ChatMessage } from '@/lib/gateway'
 import { Agent } from '@/lib/agents'
+import { useAgentTampil, ambilCustom } from '@/lib/agent-custom'
 
 const STORAGE_KEY = 'zd_chat_'
 
@@ -24,11 +25,14 @@ interface ChatWindowProps {
   agent: Agent
 }
 
-export default function ChatWindow({ agent }: ChatWindowProps) {
+export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
+  // Tampilan (nama/emoji/deskripsi) memakai versi kustom dari localStorage;
+  // agentDasar.id tetap dipakai untuk riwayat & routing backend.
+  const agent: Agent = useAgentTampil(agentDasar.id) ?? agentDasar
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    const saved = loadHistory(agent.id)
+    const saved = loadHistory(agentDasar.id)
     if (saved.length > 0) return saved
-    return [{ role: 'assistant', content: `Halo! Aku **${agent.name}**. Ada yang bisa dibantu?` }]
+    return [{ role: 'assistant', content: `Halo! Aku **${agentDasar.name}**. Ada yang bisa dibantu?` }]
   })
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -38,8 +42,8 @@ export default function ChatWindow({ agent }: ChatWindowProps) {
 
   // Persist on change
   useEffect(() => {
-    saveHistory(agent.id, messages)
-  }, [agent.id, messages])
+    saveHistory(agentDasar.id, messages)
+  }, [agentDasar.id, messages])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -47,7 +51,7 @@ export default function ChatWindow({ agent }: ChatWindowProps) {
 
   useEffect(() => {
     inputRef.current?.focus()
-  }, [agent.id])
+  }, [agentDasar.id])
 
   const handleSend = useCallback(async () => {
     const text = input.trim()
@@ -62,25 +66,31 @@ export default function ChatWindow({ agent }: ChatWindowProps) {
 
     try {
       let full = ''
+      // System prompt kustom (kalau ada) dikirim sebagai override —
+      // dibaca langsung dari localStorage saat kirim, bukan dari state,
+      // supaya selalu nilai terbaru meski baru saja diedit.
+      const custom = ambilCustom(agentDasar.id)
       await sendMessage(
-        agent.id,
+        agentDasar.id,
         updated,
         (chunk) => {
           full += chunk
           setStreamingContent(full)
-        }
+        },
+        custom.systemPrompt
       )
       setMessages((prev) => [...prev, { role: 'assistant', content: full }])
       setStreamingContent('')
-    } catch (err: any) {
+    } catch (err) {
+      const pesan = err instanceof Error ? err.message : String(err)
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: `⚠️ Error: ${err.message}` },
+        { role: 'assistant', content: `⚠️ Error: ${pesan}` },
       ])
     } finally {
       setLoading(false)
     }
-  }, [input, loading, messages, agent.id])
+  }, [input, loading, messages, agentDasar.id])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -90,7 +100,7 @@ export default function ChatWindow({ agent }: ChatWindowProps) {
   }
 
   const clearHistory = () => {
-    localStorage.removeItem(STORAGE_KEY + agent.id)
+    localStorage.removeItem(STORAGE_KEY + agentDasar.id)
     setMessages([{ role: 'assistant', content: `Halo! Aku **${agent.name}**. Ada yang bisa dibantu?` }])
   }
 
