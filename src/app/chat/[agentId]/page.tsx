@@ -24,7 +24,7 @@ export default async function ChatPage({ params }: { params: Promise<{ agentId: 
   return (
     <div className="flex h-screen">
       <Sidebar />
-      <ChatWindow agent={agent} />
+      <ChatWindow key={agent.id} agent={agent} />
     </div>
   )
 }
