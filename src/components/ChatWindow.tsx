@@ -144,27 +144,59 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
     setLoading(true)
     setStreamingContent('')
 
+    const MAX_RETRY = 3
+    const DELAY_MS = [1000, 2500, 5000] // backoff: 1s, 2.5s, 5s
+
+    let full = ''
+    let percobaan = 0
+    let berhasil = false
+
     try {
-      let full = ''
       const custom = ambilCustomCache(agentDasar.id)
-      await sendMessage(
-        agentDasar.id,
-        updated,
-        (chunk) => {
-          full += chunk
-          setStreamingContent(full)
-        },
-        custom.systemPrompt,
-        hasImages ? pastedImages : undefined,
-        agentDasar.backend // undefined untuk agent bawaan, 'openclaw'/'hermes' untuk agent kustom
-      )
+
+      while (percobaan < MAX_RETRY && !berhasil) {
+        if (percobaan > 0) {
+          // Tampilkan info retry supaya user tahu sedang dicoba ulang
+          setStreamingContent(`⟳ Mencoba ulang (${percobaan}/${MAX_RETRY - 1})...`)
+          await new Promise(r => setTimeout(r, DELAY_MS[percobaan - 1]))
+          setStreamingContent('')
+          full = ''
+        }
+
+        try {
+          await sendMessage(
+            agentDasar.id,
+            updated,
+            (chunk) => {
+              full += chunk
+              setStreamingContent(full)
+            },
+            custom.systemPrompt,
+            hasImages ? pastedImages : undefined,
+            agentDasar.backend
+          )
+          if (full.trim()) {
+            berhasil = true
+          } else {
+            percobaan++
+          }
+        } catch {
+          percobaan++
+        }
+      }
+
       setStreamingContent('')
-      // Hanya simpan kalau ada isi — respons kosong (gateway timeout,
-      // streaming gagal, dll) tidak boleh menghasilkan bubble kosong
       if (full.trim()) {
         setMessages((prev) => [...prev, { role: 'assistant', content: full }])
+      } else {
+        // Semua retry gagal — tampilkan pesan error yang informatif
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: `⚠️ Tidak ada respon setelah ${MAX_RETRY}x percobaan. Gateway mungkin sibuk, coba lagi sebentar.` },
+        ])
       }
     } catch (err) {
+      setStreamingContent('')
       const pesan = err instanceof Error ? err.message : String(err)
       setMessages((prev) => [
         ...prev,
