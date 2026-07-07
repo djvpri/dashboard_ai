@@ -115,8 +115,6 @@ export default function ChatPageClient({ initialAgent, agents: initialAgents, in
           agents={allAgents}
           activeId={activeId}
           onSwitch={switchAgent}
-          onClose={closeTab}
-          closable={allAgents.length > 1}
         />
         <ChatManager agents={allAgents} activeId={activeId} onCloseTab={closeTab} />
       </div>

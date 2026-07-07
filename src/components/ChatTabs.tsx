@@ -11,11 +11,9 @@ interface ChatTabsProps {
   agents: Agent[]
   activeId: string
   onSwitch: (id: string) => void
-  onClose?: (id: string) => void
-  closable?: boolean
 }
 
-export default function ChatTabs({ agents, activeId, onSwitch, onClose, closable = true }: ChatTabsProps) {
+export default function ChatTabs({ agents, activeId, onSwitch }: ChatTabsProps) {
   const tabsRef = useRef<HTMLDivElement>(null)
   const [scrollPos, setScrollPos] = useState(0)
   const [showLeftFade, setShowLeftFade] = useState(false)
@@ -90,15 +88,6 @@ export default function ChatTabs({ agents, activeId, onSwitch, onClose, closable
           >
             <span className="text-base">{agent.emoji}</span>
             <span>{agent.name}</span>
-            {closable && onClose && agents.length > 1 && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onClose(agent.id) }}
-                className="ml-1 p-0.5 rounded text-[10px] text-zinc-500 hover:text-red-400 hover:bg-zinc-700 transition-colors"
-                aria-label={`Close ${agent.name}`}
-              >
-                ✕
-              </button>
-            )}
             {/* Active indicator */}
             {activeId === agent.id && (
               <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-indigo-500 rounded-full" />
