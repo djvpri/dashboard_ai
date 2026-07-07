@@ -6,14 +6,15 @@ export const runtime = 'nodejs'
 export async function GET(req: NextRequest) {
   const agentId = req.nextUrl.searchParams.get('agentId')
   if (!agentId) return NextResponse.json({ error: 'agentId wajib diisi' }, { status: 400 })
-  if (!sql) return NextResponse.json({ messages: [] }) // DB belum dikonfigurasi -> mulai kosong
+  if (!sql) return NextResponse.json({ messages: [] })
 
   try {
     const [row] = await sql`SELECT messages FROM chat_history WHERE agent_id = ${agentId}`
-    return NextResponse.json({ messages: row?.messages ?? [] })
+    const raw = row?.messages
+    if (!raw) return NextResponse.json({ messages: [] })
+    const messages = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return NextResponse.json({ messages })
   } catch {
-    // Tabel belum ada (migrasi belum dijalankan) atau error lain -> jangan
-    // patahkan chat, mulai dari kosong saja.
     return NextResponse.json({ messages: [] })
   }
 }
