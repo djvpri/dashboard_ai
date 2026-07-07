@@ -3,6 +3,19 @@ export interface ChatMessage {
   content: string
 }
 
+// Multimodal types
+export interface TextPart {
+  type: 'text'
+  text: string
+}
+
+export interface ImagePart {
+  type: 'image_url'
+  image_url: { url: string }
+}
+
+export type ContentPart = TextPart | ImagePart
+
 export interface ChatCompletionChoice {
   index: number
   message: ChatMessage
@@ -35,12 +48,26 @@ export async function sendMessage(
   agentId: string,
   messages: ChatMessage[],
   onStream?: (chunk: string) => void,
-  systemPrompt?: string
+  systemPrompt?: string,
+  images?: string[] // base64 data URLs
 ): Promise<string> {
+  // Build content: if images present, use ContentPart[] array
+  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
+  let bodyMessages = messages
+  if (images && images.length > 0 && lastUserMsg) {
+    const parts: ContentPart[] = [
+      { type: 'text', text: lastUserMsg.content },
+      ...images.map(img => ({ type: 'image_url' as const, image_url: { url: img } })),
+    ]
+    bodyMessages = messages.map(m =>
+      m === lastUserMsg ? { ...m, content: parts } as unknown as ChatMessage : m
+    )
+  }
+
   const res = await fetch(`/api/chat?agentId=${agentId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, stream: !!onStream, systemPrompt }),
+    body: JSON.stringify({ messages: bodyMessages, stream: !!onStream, systemPrompt }),
   })
 
   if (!res.ok) {

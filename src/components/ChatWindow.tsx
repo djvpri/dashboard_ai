@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { sendMessage, ChatMessage } from '@/lib/gateway'
+import { sendMessage, ChatMessage, ContentPart } from '@/lib/gateway'
 import { Agent } from '@/lib/agents'
 import { useAgentTampil, ambilCustom } from '@/lib/agent-custom'
 
@@ -25,6 +25,18 @@ interface ChatWindowProps {
   agent: Agent
 }
 
+/** Extract first text + all images from a content (string or ContentPart[]) */
+function extractContent(
+  content: string | ContentPart[]
+): { text: string; images: string[] } {
+  if (typeof content === 'string') return { text: content, images: [] }
+  const text = content.find((p) => p.type === 'text')?.text || ''
+  const images = content
+    .filter((p): p is { type: 'image_url'; image_url: { url: string } } => p.type === 'image_url')
+    .map((p) => p.image_url.url)
+  return { text, images }
+}
+
 export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
   // Tampilan (nama/emoji/deskripsi) memakai versi kustom dari localStorage;
   // agentDasar.id tetap dipakai untuk riwayat & routing backend.
@@ -37,8 +49,10 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
+  const [pastedImages, setPastedImages] = useState<string[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Persist on change
   useEffect(() => {
@@ -53,14 +67,72 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
     inputRef.current?.focus()
   }, [agentDasar.id])
 
+  /** Read a File (image) → base64 data URL */
+  const fileToDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
+  /** Handle paste from clipboard */
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+
+    const imageFiles: File[] = []
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (item.type.startsWith('image/')) {
+        imageFiles.push(item.getAsFile()!)
+      }
+    }
+
+    if (imageFiles.length === 0 || imageFiles.some((f) => !f)) return
+
+    e.preventDefault()
+    const urls = await Promise.all(imageFiles.filter(Boolean).map(fileToDataURL))
+    setPastedImages((prev) => [...prev, ...urls])
+  }, [])
+
+  /** Handle file upload button */
+  const handleUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+    const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'))
+    if (imageFiles.length === 0) return
+
+    const urls = await Promise.all(imageFiles.map(fileToDataURL))
+    setPastedImages((prev) => [...prev, ...urls])
+    // Reset so same file can be re-selected
+    e.target.value = ''
+  }, [])
+
+  const removeImage = useCallback((idx: number) => {
+    setPastedImages((prev) => prev.filter((_, i) => i !== idx))
+  }, [])
+
   const handleSend = useCallback(async () => {
     const text = input.trim()
-    if (!text || loading) return
+    if ((!text && pastedImages.length === 0) || loading) return
 
-    const userMsg: ChatMessage = { role: 'user', content: text }
+    // Build user message content
+    const hasImages = pastedImages.length > 0
+    let userContent: string | ContentPart[] = text
+    if (hasImages) {
+      userContent = [
+        { type: 'text', text },
+        ...pastedImages.map((img) => ({ type: 'image_url' as const, image_url: { url: img } })),
+      ]
+    }
+
+    const userMsg: ChatMessage = { role: 'user', content: userContent } as any
     const updated = [...messages, userMsg]
-    setMessages(updated)
+    setMessages(updated as ChatMessage[])
     setInput('')
+    setPastedImages([])
     setLoading(true)
     setStreamingContent('')
 
@@ -77,7 +149,8 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
           full += chunk
           setStreamingContent(full)
         },
-        custom.systemPrompt
+        custom.systemPrompt,
+        hasImages ? pastedImages : undefined
       )
       setMessages((prev) => [...prev, { role: 'assistant', content: full }])
       setStreamingContent('')
@@ -90,7 +163,7 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
     } finally {
       setLoading(false)
     }
-  }, [input, loading, messages, agentDasar.id])
+  }, [input, loading, messages, agentDasar.id, pastedImages])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -126,19 +199,34 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
-                msg.role === 'user'
-                  ? 'bg-indigo-600 text-white rounded-br-md'
-                  : 'bg-zinc-800 text-zinc-200 rounded-bl-md'
-              }`}
-            >
-              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+        {messages.map((msg, i) => {
+          const { text, images } = extractContent(msg.content)
+          return (
+            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div
+                className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                  msg.role === 'user'
+                    ? 'bg-indigo-600 text-white rounded-br-md'
+                    : 'bg-zinc-800 text-zinc-200 rounded-bl-md'
+                }`}
+              >
+                {text && <p className="text-sm whitespace-pre-wrap">{text}</p>}
+                {images.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {images.map((img, j) => (
+                      <img
+                        key={j}
+                        src={img}
+                        alt={`Gambar ${j + 1}`}
+                        className="max-w-[240px] max-h-[240px] rounded-lg object-cover border border-zinc-700"
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
 
         {streamingContent && (
           <div className="flex justify-start">
@@ -163,21 +251,62 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
         <div ref={bottomRef} />
       </div>
 
+      {/* Image preview strip */}
+      {pastedImages.length > 0 && (
+        <div className="px-4 pt-2 bg-zinc-900 border-t border-zinc-800">
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {pastedImages.map((img, i) => (
+              <div key={i} className="relative shrink-0">
+                <img
+                  src={img}
+                  alt={`Preview ${i + 1}`}
+                  className="h-16 w-16 object-cover rounded-lg border border-zinc-700"
+                />
+                <button
+                  onClick={() => removeImage(i)}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-400"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="p-4 border-t border-zinc-800 bg-zinc-900">
         <div className="flex gap-2">
+          {/* Upload button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+            className="bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-400 rounded-xl px-3 py-2.5 text-sm transition-colors"
+            title="Upload gambar"
+          >
+            📷
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleUpload}
+            className="hidden"
+          />
           <input
             ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={`Chat dengan ${agent.name}...`}
             disabled={loading}
             className="flex-1 bg-zinc-800 text-white rounded-xl px-4 py-2.5 text-sm placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
           />
           <button
             onClick={handleSend}
-            disabled={loading || !input.trim()}
+            disabled={loading || (!input.trim() && pastedImages.length === 0)}
             className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-700 text-white rounded-xl px-4 py-2.5 transition-colors"
           >
             {loading ? '...' : 'Kirim'}

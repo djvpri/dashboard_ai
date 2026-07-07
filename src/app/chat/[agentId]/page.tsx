@@ -1,14 +1,11 @@
-'use client'
-
-import { useParams } from 'next/navigation'
+import { notFound } from 'next/navigation'
+import { getAgent } from '@/lib/agents'
 import Sidebar from '@/components/Sidebar'
 import ChatWindow from '@/components/ChatWindow'
-import { agents } from '@/lib/agents'
 
-export default function ChatPage() {
-  const params = useParams()
-  const agentId = params.agentId as string
-  const agent = agents.find((a) => a.id === agentId)
+export default async function ChatPage({ params }: { params: Promise<{ agentId: string }> }) {
+  const { agentId } = await params
+  const agent = getAgent(agentId)
 
   if (!agent) {
     return (
@@ -27,7 +24,7 @@ export default function ChatPage() {
   return (
     <div className="flex h-screen">
       <Sidebar />
-      <ChatWindow agent={agent} />
+      <ChatWindow key={agent.id} agent={agent} />
     </div>
   )
 }
