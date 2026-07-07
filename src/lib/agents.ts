@@ -6,6 +6,7 @@ export interface Agent {
   model: string
   color: string
   systemPrompt: string
+  toolsets?: string[]
 }
 
 export const agents: Agent[] = [
@@ -26,6 +27,7 @@ export const agents: Agent[] = [
     model: 'hermes-agent',
     color: '#f59e0b',
     systemPrompt: 'Kamu adalah Hermes, asisten AI spesialis coding dan eksperimen teknis dari Z-Dashboard. Kamu ahli dalam Next.js, TypeScript, Prisma, PostgreSQL, dan Railway Deployment. Prioritaskan memberikan solusi yang praktis dan bisa langsung dijalankan. Jika ada error, bantu debug step-by-step.',
+    toolsets: ['terminal', 'file', 'web', 'search'],
   },
 ]
 

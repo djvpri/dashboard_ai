@@ -68,6 +68,13 @@ export async function POST(req: NextRequest) {
       ? [{ role: 'system', content: systemPrompt } as const, ...(messages || [])]
       : (messages || [])
 
+    const body: Record<string, unknown> = {
+      model: backend.model,
+      stream: !!stream,
+      messages: msgs,
+    }
+    if (agent?.toolsets) body.toolsets = agent.toolsets
+
     const gwRes = await fetch(`${backend.url}/v1/chat/completions`, {
       method: 'POST',
       headers: {
@@ -75,11 +82,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
         'x-openclaw-agent-id': agentId,
       },
-      body: JSON.stringify({
-        model: backend.model,
-        stream: !!stream,
-        messages: msgs,
-      }),
+      body: JSON.stringify(body),
     })
 
     if (!gwRes.ok) {
