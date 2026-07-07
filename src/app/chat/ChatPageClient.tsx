@@ -11,12 +11,15 @@ import { Agent, agents as agentsBawaan, customAgentKeAgent } from '@/lib/agents'
 interface Props {
   initialAgent: Agent
   agents: Agent[]
+  initialAgentId?: string  // ID yang diminta dari URL — bisa agent kustom yang belum ada di initialAgents
 }
 
-export default function ChatPageClient({ initialAgent, agents: initialAgents }: Props) {
+export default function ChatPageClient({ initialAgent, agents: initialAgents, initialAgentId }: Props) {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const [activeId, setActiveId] = useState<string>(initialAgent.id)
+  // Mulai dari initialAgent.id, tapi nanti dikoreksi ke initialAgentId
+  // setelah agent kustom selesai diload dari DB (lihat useEffect di bawah)
+  const [activeId, setActiveId] = useState<string>(initialAgentId || initialAgent.id)
   const [allAgents, setAllAgents] = useState<Agent[]>(initialAgents)
   const [showNewModal, setShowNewModal] = useState(false)
   // Agent yang sedang di-edit (null = tidak ada)
@@ -32,11 +35,18 @@ export default function ChatPageClient({ initialAgent, agents: initialAgents }: 
             id: string; name: string; emoji: string
             description: string; backend: string; systemPrompt: string
           }) => customAgentKeAgent(a))
-          setAllAgents([...agentsBawaan, ...kustom])
+          const semuaAgent = [...agentsBawaan, ...kustom]
+          setAllAgents(semuaAgent)
+          // Kalau URL mengarah ke agent kustom (tidak ada di agent bawaan),
+          // aktifkan setelah agent kustom selesai diload dari DB
+          if (initialAgentId && !agentsBawaan.find(a => a.id === initialAgentId)) {
+            const agentKustom = kustom.find(a => a.id === initialAgentId)
+            if (agentKustom) setActiveId(initialAgentId)
+          }
         }
       })
       .catch(() => {})
-  }, [])
+  }, [initialAgentId])
 
   // Sync dengan URL
   useEffect(() => {
