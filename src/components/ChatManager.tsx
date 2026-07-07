@@ -29,7 +29,7 @@ export default function ChatManager({ agents, activeId, onCloseTab }: ChatManage
   }
 
   return (
-    <div className="flex-1 overflow-hidden relative">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {agents.map((agent) => {
         const isActive = agent.id === activeId
         const isMounted = mountedAgents.has(agent.id)
@@ -40,8 +40,8 @@ export default function ChatManager({ agents, activeId, onCloseTab }: ChatManage
           <div
             key={agent.id}
             className={cn(
-              'h-full flex flex-col',
-              isActive ? 'block' : 'hidden'
+              'flex-1 flex flex-col min-h-0',
+              isActive ? 'flex' : 'hidden'
             )}
             role="tabpanel"
             aria-labelledby={`tab-${agent.id}`}
