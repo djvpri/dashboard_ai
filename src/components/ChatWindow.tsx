@@ -186,7 +186,7 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-screen">
+    <div className="flex-1 flex flex-col">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
         <span className="text-2xl">{agent.emoji}</span>
         <div className="flex-1 min-w-0">
