@@ -1,6 +1,5 @@
 'use client'
 
-import Sidebar from '@/components/Sidebar'
 import { agents } from '@/lib/agents'
 import Link from 'next/link'
 import { useState } from 'react'
@@ -10,8 +9,6 @@ export default function HomePage() {
 
   return (
     <div className="flex h-screen">
-      <Sidebar />
-      
       {/* Mobile hamburger button */}
       <button
         onClick={() => setSidebarOpen(true)}
@@ -31,7 +28,7 @@ export default function HomePage() {
           {agents.map((agent) => (
             <Link
               key={agent.id}
-              href={`/chat/${agent.id}`}
+              href={`/chat?agent=${agent.id}`}
               onClick={() => setSidebarOpen(false)}
               className="flex items-center gap-4 p-4 sm:p-6 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-colors group min-h-[80px]"
             >
