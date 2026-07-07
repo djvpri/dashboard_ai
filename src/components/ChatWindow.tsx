@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { sendMessage, ChatMessage, ContentPart } from '@/lib/gateway'
 import { Agent } from '@/lib/agents'
 import { useAgentTampil, ambilCustomCache } from '@/lib/agent-custom'
+import { useUnread } from '@/lib/unread'
 
 interface ChatWindowProps {
   agent: Agent
@@ -29,6 +30,7 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
   // Tampilan (nama/emoji/deskripsi) memakai versi kustom dari server;
   // agentDasar.id tetap dipakai untuk riwayat & routing backend.
   const agent: Agent = useAgentTampil(agentDasar.id) ?? agentDasar
+  const { tambah: tambahUnread } = useUnread()
   const [messages, setMessages] = useState<ChatMessage[]>(() => [pesanSapaan(agentDasar.name)])
   const [historyLoaded, setHistoryLoaded] = useState(false)
   const [input, setInput] = useState('')
@@ -188,6 +190,7 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
       setStreamingContent('')
       if (full.trim()) {
         setMessages((prev) => [...prev, { role: 'assistant', content: full }])
+        tambahUnread(agentDasar.id) // Notifikasi — context akan skip kalau ini agent aktif
       } else {
         // Semua retry gagal — tampilkan pesan error yang informatif
         setMessages((prev) => [

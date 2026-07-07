@@ -7,6 +7,7 @@ import ChatTabs from '@/components/ChatTabs'
 import ChatManager from '@/components/ChatManager'
 import NewAgentModal from '@/components/NewAgentModal'
 import { Agent, agents as agentsBawaan, customAgentKeAgent } from '@/lib/agents'
+import { UnreadProvider } from '@/lib/unread'
 
 interface Props {
   initialAgent: Agent
@@ -103,6 +104,7 @@ export default function ChatPageClient({ initialAgent, agents: initialAgents, in
   }
 
   return (
+    <UnreadProvider activeId={activeId}>
     <div className="flex h-screen">
       <Sidebar
         activeId={activeId}
@@ -144,5 +146,6 @@ export default function ChatPageClient({ initialAgent, agents: initialAgents, in
         />
       )}
     </div>
+    </UnreadProvider>
   )
 }

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Agent } from '@/lib/agents'
 import { useSemuaAgentTampil } from '@/lib/agent-custom'
 import AgentEditModal from './AgentEditModal'
+import { useUnread } from '@/lib/unread'
 
 interface SidebarProps {
   activeId: string
@@ -16,6 +17,7 @@ interface SidebarProps {
 export default function Sidebar({ activeId, onSwitchAgent, agents, onEditAgent }: SidebarProps) {
   const [editId, setEditId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
+  const { unread } = useUnread()
   // Kustomisasi tampilan (nama/emoji) dari server — diterapkan ke agent bawaan
   const agentsTampil = useSemuaAgentTampil()
   const tampilMap = Object.fromEntries(agentsTampil.map(a => [a.id, a]))
@@ -63,6 +65,10 @@ export default function Sidebar({ activeId, onSwitchAgent, agents, onEditAgent }
                     <div className="font-medium text-sm truncate">{tampil.name}</div>
                     <div className="text-xs text-zinc-500 truncate">{tampil.description}</div>
                   </div>
+                  {/* Dot unread */}
+                  {unread[agent.id] > 0 && (
+                    <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0 animate-pulse" />
+                  )}
                   {/* Badge kustom */}
                   {agent.isCustom && (
                     <span className="text-[9px] bg-violet-500/20 text-violet-400 rounded px-1 shrink-0">kustom</span>

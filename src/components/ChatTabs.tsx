@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Agent } from '@/lib/agents'
+import { useUnread } from '@/lib/unread'
 
 function cn(...classes: (string | undefined | null | false)[]) {
   return classes.filter(Boolean).join(' ')
@@ -18,6 +19,7 @@ export default function ChatTabs({ agents, activeId, onSwitch }: ChatTabsProps) 
   const [scrollPos, setScrollPos] = useState(0)
   const [showLeftFade, setShowLeftFade] = useState(false)
   const [showRightFade, setShowRightFade] = useState(false)
+  const { unread } = useUnread()
 
   const scrollLeft = () => {
     tabsRef.current?.scrollBy({ left: -200, behavior: 'smooth' })
@@ -88,6 +90,12 @@ export default function ChatTabs({ agents, activeId, onSwitch }: ChatTabsProps) 
           >
             <span className="text-base">{agent.emoji}</span>
             <span>{agent.name}</span>
+            {/* Badge unread */}
+            {unread[agent.id] > 0 && (
+              <span className="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-indigo-500 text-white text-[10px] font-bold flex items-center justify-center">
+                {unread[agent.id] > 99 ? '99+' : unread[agent.id]}
+              </span>
+            )}
             {/* Active indicator */}
             {activeId === agent.id && (
               <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-indigo-500 rounded-full" />
