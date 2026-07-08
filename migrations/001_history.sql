@@ -32,3 +32,6 @@ CREATE TABLE IF NOT EXISTS custom_agents (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Tambah kolom quick_prompts ke agent_custom (template chat per agent)
+ALTER TABLE agent_custom ADD COLUMN IF NOT EXISTS quick_prompts jsonb NOT NULL DEFAULT '[]'::jsonb;

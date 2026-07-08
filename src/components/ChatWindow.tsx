@@ -5,6 +5,7 @@ import { sendMessage, ChatMessage, ContentPart } from '@/lib/gateway'
 import { Agent } from '@/lib/agents'
 import { useAgentTampil, ambilCustomCache } from '@/lib/agent-custom'
 import { useUnread } from '@/lib/unread'
+import QuickPrompts from './QuickPrompts'
 
 interface ChatWindowProps {
   agent: Agent
@@ -31,6 +32,8 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
   // agentDasar.id tetap dipakai untuk riwayat & routing backend.
   const agent: Agent = useAgentTampil(agentDasar.id) ?? agentDasar
   const { tambah: tambahUnread } = useUnread()
+  // Quick prompts dari kustomisasi agent — diambil dari cache (sinkron)
+  const quickPrompts: string[] = ambilCustomCache(agentDasar.id).quickPrompts ?? []
   const [messages, setMessages] = useState<ChatMessage[]>(() => [pesanSapaan(agentDasar.name)])
   const [historyLoaded, setHistoryLoaded] = useState(false)
   const [input, setInput] = useState('')
@@ -303,6 +306,14 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
 
         <div ref={bottomRef} />
       </div>
+
+      {/* Quick prompts — muncul saat chat baru/hanya ada sapaan awal */}
+      {messages.length <= 1 && quickPrompts.length > 0 && (
+        <QuickPrompts
+          prompts={quickPrompts}
+          onSelect={(p) => setInput(p)}
+        />
+      )}
 
       {/* Image preview strip */}
       {pastedImages.length > 0 && (

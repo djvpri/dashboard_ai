@@ -17,6 +17,7 @@ export interface AgentCustom {
   emoji?: string
   description?: string
   systemPrompt?: string
+  quickPrompts?: string[]
 }
 
 const EVENT = 'zd-agent-custom-changed'
@@ -63,13 +64,14 @@ function initCacheKalauBelum() {
 }
 
 function dariItem(item: {
-  name?: string; emoji?: string; description?: string; systemPrompt?: string
+  name?: string; emoji?: string; description?: string; systemPrompt?: string; quickPrompts?: string[]
 }): AgentCustom {
   return {
     name: item.name || undefined,
     emoji: item.emoji || undefined,
     description: item.description || undefined,
     systemPrompt: item.systemPrompt || undefined,
+    quickPrompts: Array.isArray(item.quickPrompts) ? item.quickPrompts : undefined,
   }
 }
 
@@ -112,6 +114,9 @@ export async function simpanCustom(agentId: string, data: AgentCustom): Promise<
   if (data.emoji?.trim()) bersih.emoji = data.emoji.trim()
   if (data.description?.trim()) bersih.description = data.description.trim()
   if (data.systemPrompt?.trim()) bersih.systemPrompt = data.systemPrompt.trim()
+  if (Array.isArray(data.quickPrompts)) {
+    bersih.quickPrompts = data.quickPrompts.map(p => p.trim()).filter(Boolean)
+  }
 
   await fetch('/api/agent-custom', {
     method: 'POST',

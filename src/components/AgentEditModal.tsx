@@ -17,6 +17,7 @@ export default function AgentEditModal({ agentId, onClose }: Props) {
   const [emoji, setEmoji] = useState('')
   const [description, setDescription] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
+  const [quickPrompts, setQuickPrompts] = useState<string[]>([])
 
   // Nilai FRESH dari server tiap modal dibuka — bukan cache — supaya form
   // terisi data terbaru meski diedit dari perangkat lain sebelumnya.
@@ -30,6 +31,7 @@ export default function AgentEditModal({ agentId, onClose }: Props) {
       setEmoji(custom.emoji ?? dasar.emoji)
       setDescription(custom.description ?? dasar.description)
       setSystemPrompt(custom.systemPrompt ?? dasar.systemPrompt)
+      setQuickPrompts(custom.quickPrompts ?? [])
       setLoading(false)
     })
     return () => { batal = true }
@@ -49,6 +51,7 @@ export default function AgentEditModal({ agentId, onClose }: Props) {
         emoji: emoji !== dasar.emoji ? emoji : undefined,
         description: description !== dasar.description ? description : undefined,
         systemPrompt: systemPrompt !== dasar.systemPrompt ? systemPrompt : undefined,
+        quickPrompts,
       })
       onClose()
     } finally {
@@ -124,6 +127,41 @@ export default function AgentEditModal({ agentId, onClose }: Props) {
                 rows={6}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500 resize-y"
               />
+            </div>
+
+            {/* Quick Prompts */}
+            <div>
+              <label className="text-xs text-zinc-400 block mb-1.5">
+                Template chat (muncul sebagai chip saat chat kosong, maks 6)
+              </label>
+              <div className="space-y-2">
+                {quickPrompts.map((p, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <input
+                      value={p}
+                      onChange={e => {
+                        const baru = [...quickPrompts]
+                        baru[i] = e.target.value
+                        setQuickPrompts(baru)
+                      }}
+                      placeholder={`Template ${i + 1}`}
+                      className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-indigo-500"
+                    />
+                    <button
+                      onClick={() => setQuickPrompts(quickPrompts.filter((_, j) => j !== i))}
+                      className="text-zinc-500 hover:text-red-400 transition-colors text-lg leading-none px-1"
+                    >×</button>
+                  </div>
+                ))}
+                {quickPrompts.length < 6 && (
+                  <button
+                    onClick={() => setQuickPrompts([...quickPrompts, ''])}
+                    className="text-xs text-zinc-500 hover:text-indigo-400 transition-colors flex items-center gap-1"
+                  >
+                    <span className="text-base">+</span> Tambah template
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center justify-between gap-2 pt-1">

@@ -9,6 +9,7 @@ interface CustomRow {
   emoji: string | null
   description: string | null
   system_prompt: string | null
+  quick_prompts: string[] | null
 }
 
 function keCamel(row: CustomRow) {
@@ -18,11 +19,10 @@ function keCamel(row: CustomRow) {
     emoji: row.emoji ?? undefined,
     description: row.description ?? undefined,
     systemPrompt: row.system_prompt ?? undefined,
+    quickPrompts: Array.isArray(row.quick_prompts) ? row.quick_prompts : [],
   }
 }
 
-// GET tanpa query -> semua kustomisasi (dipakai Sidebar, sekali fetch utk semua agent)
-// GET ?agentId=x -> kustomisasi satu agent saja
 export async function GET(req: NextRequest) {
   const agentId = req.nextUrl.searchParams.get('agentId')
   if (!sql) return NextResponse.json({ items: [] })
@@ -38,19 +38,22 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { agentId, name, emoji, description, systemPrompt } = await req.json()
+  const { agentId, name, emoji, description, systemPrompt, quickPrompts } = await req.json()
   if (!agentId) return NextResponse.json({ error: 'agentId wajib diisi' }, { status: 400 })
   if (!sql) return NextResponse.json({ ok: false, error: 'Database belum dikonfigurasi' }, { status: 503 })
 
+  const qp = JSON.stringify(Array.isArray(quickPrompts) ? quickPrompts.filter(Boolean) : [])
+
   try {
     await sql`
-      INSERT INTO agent_custom (agent_id, name, emoji, description, system_prompt, updated_at)
-      VALUES (${agentId}, ${name ?? null}, ${emoji ?? null}, ${description ?? null}, ${systemPrompt ?? null}, now())
+      INSERT INTO agent_custom (agent_id, name, emoji, description, system_prompt, quick_prompts, updated_at)
+      VALUES (${agentId}, ${name ?? null}, ${emoji ?? null}, ${description ?? null}, ${systemPrompt ?? null}, ${qp}::jsonb, now())
       ON CONFLICT (agent_id) DO UPDATE SET
         name = EXCLUDED.name,
         emoji = EXCLUDED.emoji,
         description = EXCLUDED.description,
         system_prompt = EXCLUDED.system_prompt,
+        quick_prompts = EXCLUDED.quick_prompts,
         updated_at = now()
     `
     return NextResponse.json({ ok: true })
