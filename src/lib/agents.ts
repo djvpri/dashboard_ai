@@ -50,6 +50,7 @@ export function customAgentKeAgent(data: {
   description: string
   backend: string
   systemPrompt: string
+  quickPrompts?: string[]
 }): Agent {
   return {
     id: data.id,
@@ -61,5 +62,6 @@ export function customAgentKeAgent(data: {
     systemPrompt: data.systemPrompt,
     backend: data.backend,
     isCustom: true,
+    quickPrompts: data.quickPrompts ?? [],
   }
 }

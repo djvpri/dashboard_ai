@@ -12,6 +12,7 @@ interface Props {
     description: string
     backend: string
     systemPrompt: string
+    quickPrompts?: string[]
   } | null
   onSave: (agent: Agent) => void
   onDelete?: (id: string) => void
@@ -30,6 +31,7 @@ export default function NewAgentModal({ initialData, onSave, onDelete, onClose }
   const [description, setDescription] = useState(initialData?.description ?? '')
   const [backend, setBackend] = useState(initialData?.backend ?? 'openclaw')
   const [systemPrompt, setSystemPrompt] = useState(initialData?.systemPrompt ?? '')
+  const [quickPrompts, setQuickPrompts] = useState<string[]>(initialData?.quickPrompts ?? [])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -38,7 +40,7 @@ export default function NewAgentModal({ initialData, onSave, onDelete, onClose }
     setSaving(true)
     setError('')
     try {
-      const body = { name: name.trim(), emoji: emoji.trim() || '🤖', description: description.trim(), backend, systemPrompt: systemPrompt.trim() }
+      const body = { name: name.trim(), emoji: emoji.trim() || '🤖', description: description.trim(), backend, systemPrompt: systemPrompt.trim(), quickPrompts: quickPrompts.filter(Boolean) }
       const res = await fetch(
         isEdit ? '/api/agents' : '/api/agents',
         {
@@ -140,6 +142,41 @@ export default function NewAgentModal({ initialData, onSave, onDelete, onClose }
             placeholder="Kamu adalah [nama], asisten AI yang..."
             className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500 resize-y"
           />
+        </div>
+
+        {/* Quick Prompts */}
+        <div>
+          <label className="text-xs text-zinc-400 block mb-1.5">
+            Template chat (chip di atas input saat chat baru, maks 6)
+          </label>
+          <div className="space-y-2">
+            {quickPrompts.map((p, i) => (
+              <div key={i} className="flex gap-2 items-center">
+                <input
+                  value={p}
+                  onChange={e => {
+                    const baru = [...quickPrompts]
+                    baru[i] = e.target.value
+                    setQuickPrompts(baru)
+                  }}
+                  placeholder={`Template ${i + 1}`}
+                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-indigo-500"
+                />
+                <button
+                  onClick={() => setQuickPrompts(quickPrompts.filter((_, j) => j !== i))}
+                  className="text-zinc-500 hover:text-red-400 transition-colors text-lg leading-none px-1"
+                >×</button>
+              </div>
+            ))}
+            {quickPrompts.length < 6 && (
+              <button
+                onClick={() => setQuickPrompts([...quickPrompts, ''])}
+                className="text-xs text-zinc-500 hover:text-indigo-400 transition-colors flex items-center gap-1"
+              >
+                <span className="text-base">+</span> Tambah template
+              </button>
+            )}
+          </div>
         </div>
 
         {error && <p className="text-xs text-red-400">{error}</p>}

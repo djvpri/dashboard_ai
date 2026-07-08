@@ -12,6 +12,7 @@ interface AgentRow {
   system_prompt: string
   sort_order: number
   created_at: string
+  quick_prompts: string[] | null
 }
 
 function keAgent(row: AgentRow) {
@@ -24,6 +25,7 @@ function keAgent(row: AgentRow) {
     systemPrompt: row.system_prompt,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
+    quickPrompts: Array.isArray(row.quick_prompts) ? row.quick_prompts : [],
   }
 }
 
@@ -48,13 +50,14 @@ export async function GET() {
 // POST — buat agent baru
 export async function POST(req: NextRequest) {
   if (!sql) return NextResponse.json({ ok: false, error: 'Database belum dikonfigurasi' }, { status: 503 })
-  const { name, emoji, description, backend, systemPrompt } = await req.json()
+  const { name, emoji, description, backend, systemPrompt, quickPrompts } = await req.json()
   if (!name?.trim()) return NextResponse.json({ error: 'Nama wajib diisi' }, { status: 400 })
 
   const id = buatId()
+  const qp = JSON.stringify(Array.isArray(quickPrompts) ? quickPrompts.filter(Boolean) : [])
   try {
     await sql`
-      INSERT INTO custom_agents (id, name, emoji, description, backend, system_prompt, sort_order)
+      INSERT INTO custom_agents (id, name, emoji, description, backend, system_prompt, quick_prompts, sort_order)
       VALUES (
         ${id},
         ${name.trim()},
@@ -62,6 +65,7 @@ export async function POST(req: NextRequest) {
         ${(description || '').trim()},
         ${backend === 'hermes' ? 'hermes' : 'openclaw'},
         ${(systemPrompt || '').trim()},
+        ${qp}::jsonb,
         (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM custom_agents)
       )
     `
@@ -74,10 +78,11 @@ export async function POST(req: NextRequest) {
 // PUT — update agent kustom (nama, emoji, deskripsi, backend, system prompt)
 export async function PUT(req: NextRequest) {
   if (!sql) return NextResponse.json({ ok: false, error: 'Database belum dikonfigurasi' }, { status: 503 })
-  const { id, name, emoji, description, backend, systemPrompt } = await req.json()
+  const { id, name, emoji, description, backend, systemPrompt, quickPrompts } = await req.json()
   if (!id) return NextResponse.json({ error: 'id wajib diisi' }, { status: 400 })
   if (!name?.trim()) return NextResponse.json({ error: 'Nama wajib diisi' }, { status: 400 })
 
+  const qp = JSON.stringify(Array.isArray(quickPrompts) ? quickPrompts.filter(Boolean) : [])
   try {
     const result = await sql`
       UPDATE custom_agents SET
@@ -86,6 +91,7 @@ export async function PUT(req: NextRequest) {
         description = ${(description || '').trim()},
         backend = ${backend === 'hermes' ? 'hermes' : 'openclaw'},
         system_prompt = ${(systemPrompt || '').trim()},
+        quick_prompts = ${qp}::jsonb,
         updated_at = now()
       WHERE id = ${id}
     `
