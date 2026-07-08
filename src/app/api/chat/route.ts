@@ -58,25 +58,56 @@ export async function POST(req: NextRequest) {
   try {
     const { messages, stream, systemPrompt: promptKustom } = await req.json()
 
-    // Override system prompt dari kustomisasi agent di sisi client
-    // (localStorage) — aman untuk dashboard pribadi satu pengguna yang
-    // sudah di belakang login; dibatasi panjangnya supaya tidak bisa
-    // dipakai membanjiri context backend secara tidak sengaja.
     const agent = getAgent(agentId)
     const systemPrompt =
       typeof promptKustom === 'string' && promptKustom.trim()
         ? promptKustom.trim().slice(0, 8000)
         : agent?.systemPrompt
 
-    // Inject system prompt as first message
-    const msgs = systemPrompt
-      ? [{ role: 'system', content: systemPrompt } as const, ...(messages || [])]
-      : (messages || [])
+    // Tool injection untuk Hermes — fetch data DevOps ZPOS sebelum dikirim
+    // ke Hermes sebagai konteks. Hermes berjalan di container Railway terpisah
+    // dan tidak bisa langsung akses endpoint /api/tools/devops.
+    let injectedMsgs = messages || []
+    if (agentId === 'hermes' && injectedMsgs.length > 0) {
+      const lastMsg = injectedMsgs[injectedMsgs.length - 1]
+      const teks = (typeof lastMsg?.content === 'string' ? lastMsg.content : '').toLowerCase()
+      const BASE = (process.env.NEXTAUTH_URL || 'http://localhost:3000').replace(/\/+$/, '')
+
+      async function fetchTool(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+        const r = await fetch(`${BASE}/api/tools/devops`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        return r.json()
+      }
+
+      function inject(konteks: string) {
+        injectedMsgs = [...injectedMsgs.slice(0, -1), { role: 'user', content: konteks }, lastMsg]
+      }
+
+      try {
+        if (teks.includes('cek error') || teks.includes('error terbaru') || teks.includes('log zpos') || teks.includes('check error')) {
+          const d = await fetchTool({ action: 'check_errors', lines: 300 })
+          inject(`[DATA RAILWAY ZPOS]\nStatus: ${d.deploymentStatus}\nError count: ${d.errorCount}\nErrors:\n${(d.errors as string[] || []).join('\n')}\n\nLog terbaru:\n${d.recentLogs}`)
+        } else if (teks.includes('deployment') || teks.includes('deploy terakhir')) {
+          const d = await fetchTool({ action: 'get_deployments' })
+          inject(`[DEPLOYMENT ZPOS]\n${JSON.stringify(d.deployments, null, 2)}`)
+        } else if (teks.includes('commit') || teks.includes('perubahan terakhir')) {
+          const d = await fetchTool({ action: 'get_commits' })
+          inject(`[COMMIT TERAKHIR ZPOS]\n${(d.commits as { sha: string; date: string; author: string; message: string }[] || []).map(c => `${c.sha} | ${c.date?.slice(0, 10)} | ${c.author} | ${c.message}`).join('\n')}`)
+        }
+      } catch { /* tool gagal — kirim pesan asli saja */ }
+    }
+
+    // Inject system prompt
+    const finalMsgs = systemPrompt
+      ? [{ role: 'system', content: systemPrompt } as const, ...injectedMsgs]
+      : injectedMsgs
 
     const body: Record<string, unknown> = {
       model: backend.model,
       stream: !!stream,
-      messages: msgs,
+      messages: finalMsgs,
     }
     if (agent?.toolsets) body.toolsets = agent.toolsets
 
