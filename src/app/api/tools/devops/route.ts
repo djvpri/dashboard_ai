@@ -19,6 +19,43 @@ export async function POST(req: NextRequest) {
   try {
     switch (action) {
 
+      case 'redeploy': {
+        // Trigger redeploy Railway untuk service tertentu via GraphQL API
+        const { serviceId, environmentId } = body
+        if (!serviceId) return NextResponse.json({ error: 'serviceId wajib diisi' }, { status: 400 })
+        const RAILWAY_TOKEN = process.env.RAILWAY_TOKEN
+        if (!RAILWAY_TOKEN) return NextResponse.json({ error: 'RAILWAY_TOKEN belum dikonfigurasi' }, { status: 503 })
+
+        const res = await fetch('https://backboard.railway.app/graphql/v2', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${RAILWAY_TOKEN}`,
+          },
+          body: JSON.stringify({
+            query: `mutation($serviceId: String!, $environmentId: String) {
+              serviceInstanceRedeploy(serviceId: $serviceId, environmentId: $environmentId)
+            }`,
+            variables: { serviceId, environmentId: environmentId || null },
+          }),
+        })
+        const data = await res.json()
+        if (data.errors?.length) {
+          return NextResponse.json({ error: data.errors[0].message }, { status: 500 })
+        }
+        return NextResponse.json({ ok: true, message: `Redeploy triggered untuk service ${serviceId}` })
+      }
+
+      case 'exec': {
+        const { command, cwd } = body
+        if (!command) return NextResponse.json({ error: 'command wajib diisi' }, { status: 400 })
+        const data = await callInternal('/api/tools/exec', {
+          method: 'POST',
+          body: JSON.stringify({ command, cwd }),
+        })
+        return NextResponse.json(data)
+      }
+
       case 'projects': {
         const data = await callInternal('/api/tools/railway?action=projects')
         return NextResponse.json(data)

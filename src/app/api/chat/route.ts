@@ -139,6 +139,28 @@ export async function POST(req: NextRequest) {
           console.log('[tool-injection] action: get_commits')
           const d = await fetchTool({ action: 'get_commits' })
           inject(`[COMMIT TERAKHIR ZPOS]\n${(d.commits as { sha: string; date: string; author: string; message: string }[] || []).map(c => `${c.sha} | ${c.date?.slice(0, 10)} | ${c.author} | ${c.message}`).join('\n')}`)
+        } else if (teks.includes('redeploy') || teks.includes('deploy ulang')) {
+          // Deteksi service ID dari pesan (UUID) atau nama app
+          const PROJECT_MAP: Record<string, { serviceId: string; environmentId?: string }> = {
+            zgym: { serviceId: '794b65a8-e57d-4c46-bf56-591e1ac4ed4d' },
+            zbengkel: { serviceId: '54e596fe-2661-41ea-ba37-a60576e0febd' },
+            zresto: { serviceId: 'cba1d12b-9d7b-4639-90f6-193481f985b9' },
+            zpos: { serviceId: 'f026c44d-60cd-4bb8-a277-a3cd9dec70a7', environmentId: 'eea0eae9-23a7-4611-845f-9cb6176cceaa' },
+            ztransport: { serviceId: 'f6d82f7e-95df-4dc3-9557-eada4fd91d01' },
+            zbarber: { serviceId: 'a1421b59-15d6-4e14-ac47-0fe86c11f680' },
+          }
+          const appKey = Object.keys(PROJECT_MAP).find(k => teks.includes(k))
+          const uuidMatch = (lastMsg.content as string).match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
+          const serviceId = uuidMatch?.[1] || (appKey ? PROJECT_MAP[appKey].serviceId : null)
+          const environmentId = appKey ? PROJECT_MAP[appKey].environmentId : undefined
+
+          if (serviceId) {
+            console.log('[tool-injection] action: redeploy', serviceId)
+            const d = await fetchTool({ action: 'redeploy', serviceId, environmentId })
+            inject(`[REDEPLOY RAILWAY]\n${d.ok ? `✅ ${d.message}` : `❌ Gagal: ${d.error}`}`)
+          } else {
+            inject(`[REDEPLOY] Tidak dapat mendeteksi service mana yang mau di-redeploy. Sebutkan nama app (zgym, zbengkel, dll) atau service ID-nya.`)
+          }
         } else {
           console.log('[tool-injection] tidak ada kata kunci cocok')
         }
