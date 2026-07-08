@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
     // ke Hermes sebagai konteks. Hermes berjalan di container Railway terpisah
     // dan tidak bisa langsung akses endpoint /api/tools/devops.
     let injectedMsgs = messages || []
+    let injectedSystemPrompt: string | undefined
     if (agentId === 'hermes' && injectedMsgs.length > 0) {
       const lastMsg = injectedMsgs[injectedMsgs.length - 1]
       const teks = (typeof lastMsg?.content === 'string' ? lastMsg.content : '').toLowerCase()
@@ -83,7 +84,10 @@ export async function POST(req: NextRequest) {
       }
 
       function inject(konteks: string) {
-        injectedMsgs = [...injectedMsgs.slice(0, -1), { role: 'user', content: konteks }, lastMsg]
+        // Inject ke system prompt supaya Hermes memprioritaskan data ini
+        // sebagai konteks resmi, bukan pesan user biasa yang bisa diabaikan
+        injectedSystemPrompt = (injectedSystemPrompt || systemPrompt || '') +
+          `\n\n=== DATA REAL-TIME (SUDAH DIAMBIL OTOMATIS) ===\n${konteks}\n=== ANALISIS DATA DI ATAS DAN JAWAB PERTANYAAN USER ===`
       }
 
       try {
@@ -127,9 +131,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Inject system prompt
-    const finalMsgs = systemPrompt
-      ? [{ role: 'system', content: systemPrompt } as const, ...injectedMsgs]
+    // Inject system prompt — pakai versi yang sudah ditambah data real-time kalau ada
+    const finalSystemPrompt = injectedSystemPrompt || systemPrompt
+    const finalMsgs = finalSystemPrompt
+      ? [{ role: 'system', content: finalSystemPrompt } as const, ...injectedMsgs]
       : injectedMsgs
 
     const body: Record<string, unknown> = {
