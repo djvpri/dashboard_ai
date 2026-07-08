@@ -74,16 +74,35 @@ export async function GET(req: NextRequest) {
       const latestDep = depData.deployments?.edges?.[0]?.node
       if (!latestDep) return NextResponse.json({ error: 'Tidak ada deployment ditemukan' }, { status: 404 })
 
-      // Fetch log deployment
-      const logData = await gql(`
-        query($deploymentId: String!, $lines: Int) {
-          deploymentLogs(deploymentId: $deploymentId, tail: $lines) {
-            timestamp message severity
+      // Fetch log deployment — coba beberapa variasi argument
+      // karena Railway GraphQL schema berubah-ubah
+      let logs: { timestamp: string; message: string; severity: string }[] = []
+      
+      // Coba tanpa argument dulu
+      try {
+        const logData = await gql(`
+          query($deploymentId: String!) {
+            deploymentLogs(deploymentId: $deploymentId) {
+              timestamp message severity
+            }
           }
+        `, { deploymentId: latestDep.id })
+        logs = logData.deploymentLogs ?? []
+      } catch {
+        // Coba dengan limit
+        try {
+          const logData = await gql(`
+            query($deploymentId: String!) {
+              deploymentLogs(deploymentId: $deploymentId, limit: ${lines}) {
+                timestamp message severity
+              }
+            }
+          `, { deploymentId: latestDep.id })
+          logs = logData.deploymentLogs ?? []
+        } catch (e2) {
+          throw new Error(`deploymentLogs gagal: ${e2 instanceof Error ? e2.message : e2}`)
         }
-      `, { deploymentId: latestDep.id, lines })
-
-      const logs: { timestamp: string; message: string; severity: string }[] = logData.deploymentLogs ?? []
+      }
       const formatted = logs.map(l =>
         `[${new Date(l.timestamp).toISOString()}] [${l.severity || 'INFO'}] ${l.message}`
       ).join('\n')
