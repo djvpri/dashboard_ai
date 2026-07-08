@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { Agent } from '@/lib/agents'
 import { useSemuaAgentTampil } from '@/lib/agent-custom'
@@ -18,6 +18,55 @@ export default function Sidebar({ activeId, onSwitchAgent, agents, onEditAgent }
   const [editId, setEditId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const { unread } = useUnread()
+
+  // Resizable sidebar
+  const MIN_WIDTH = 180
+  const MAX_WIDTH = 400
+  const DEFAULT_WIDTH = 256 // w-64
+  const [width, setWidth] = useState(() => {
+    if (typeof window === 'undefined') return DEFAULT_WIDTH
+    const saved = localStorage.getItem('zd_sidebar_width')
+    return saved ? Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, parseInt(saved))) : DEFAULT_WIDTH
+  })
+  const dragging = useRef(false)
+  const startX = useRef(0)
+  const startWidth = useRef(0)
+
+  const onMouseMove = useCallback((e: MouseEvent) => {
+    if (!dragging.current) return
+    const delta = e.clientX - startX.current
+    const newW = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth.current + delta))
+    setWidth(newW)
+  }, [])
+
+  const onMouseUp = useCallback(() => {
+    if (!dragging.current) return
+    dragging.current = false
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    setWidth(w => {
+      localStorage.setItem('zd_sidebar_width', String(w))
+      return w
+    })
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [onMouseMove, onMouseUp])
+
+  function startDrag(e: React.MouseEvent) {
+    e.preventDefault()
+    dragging.current = true
+    startX.current = e.clientX
+    startWidth.current = width
+    document.body.style.cursor = 'ew-resize'
+    document.body.style.userSelect = 'none'
+  }
   // Kustomisasi tampilan (nama/emoji) dari server — diterapkan ke agent bawaan
   const agentsTampil = useSemuaAgentTampil()
   const tampilMap = Object.fromEntries(agentsTampil.map(a => [a.id, a]))
@@ -39,7 +88,10 @@ export default function Sidebar({ activeId, onSwitchAgent, agents, onEditAgent }
         <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setOpen(false)} aria-hidden="true" />
       )}
 
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-zinc-900 border-r border-zinc-800 flex flex-col transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      <aside
+        style={{ width: `${width}px` }}
+        className={`fixed inset-y-0 left-0 z-50 bg-zinc-900 border-r border-zinc-800 flex flex-col transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+      >
 
         <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
@@ -103,6 +155,15 @@ export default function Sidebar({ activeId, onSwitchAgent, agents, onEditAgent }
         </nav>
 
         {editId && <AgentEditModal agentId={editId} onClose={() => setEditId(null)} />}
+
+        {/* Drag handle — hanya di desktop (lg+) */}
+        <div
+          onMouseDown={startDrag}
+          className="hidden lg:flex absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize group items-center justify-center z-10"
+          title="Geser untuk ubah lebar sidebar"
+        >
+          <div className="w-0.5 h-12 rounded-full bg-zinc-700 group-hover:bg-indigo-500 transition-colors duration-150" />
+        </div>
       </aside>
     </>
   )
