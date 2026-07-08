@@ -48,6 +48,10 @@ export async function POST(req: NextRequest) {
         return callInternal('/api/tools/railway?action=deployments')
       }
 
+      case 'projects': {
+        return callInternal('/api/tools/railway?action=projects')
+      }
+
       case 'get_file': {
         const { path: filePath } = body
         if (!filePath) return NextResponse.json({ error: 'path wajib diisi' }, { status: 400 })
