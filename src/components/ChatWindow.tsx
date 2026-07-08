@@ -32,8 +32,9 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
   // agentDasar.id tetap dipakai untuk riwayat & routing backend.
   const agent: Agent = useAgentTampil(agentDasar.id) ?? agentDasar
   const { tambah: tambahUnread } = useUnread()
-  // Quick prompts dari kustomisasi agent — diambil dari cache (sinkron)
-  const quickPrompts: string[] = ambilCustomCache(agentDasar.id).quickPrompts ?? []
+  // quickPrompts diambil dari `agent` (sudah reaktif via useAgentTampil —
+  // berubah otomatis saat fetch server selesai & cache diperbarui)
+  const quickPrompts: string[] = agent.quickPrompts ?? []
   const [messages, setMessages] = useState<ChatMessage[]>(() => [pesanSapaan(agentDasar.name)])
   const [historyLoaded, setHistoryLoaded] = useState(false)
   const [input, setInput] = useState('')

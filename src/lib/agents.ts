@@ -7,8 +7,9 @@ export interface Agent {
   color: string
   systemPrompt: string
   toolsets?: string[]
-  isCustom?: boolean   // true kalau dibuat dari UI, bukan agent bawaan
-  backend?: string     // 'openclaw' | 'hermes' — dipakai routing di api/chat
+  isCustom?: boolean
+  backend?: string
+  quickPrompts?: string[]  // template chat — muncul sebagai chip saat chat baru
 }
 
 export const agents: Agent[] = [
