@@ -43,14 +43,13 @@ export default function AgentEditModal({ agentId, onClose }: Props) {
     if (!dasar) return
     setSaving(true)
     try {
-      // Nilai yang sama dengan default tidak perlu disimpan sebagai kustom
-      // — biar reset default resmi (kalau nanti diubah di kode) tetap
-      // mengalir ke yang belum mengkustomisasi field itu.
+      // Kirim semua field — simpanCustom yang akan handle mana yang
+      // benar-benar perlu disimpan vs default
       await simpanCustom(agentId, {
-        name: name !== dasar.name ? name : undefined,
-        emoji: emoji !== dasar.emoji ? emoji : undefined,
-        description: description !== dasar.description ? description : undefined,
-        systemPrompt: systemPrompt !== dasar.systemPrompt ? systemPrompt : undefined,
+        name,
+        emoji,
+        description,
+        systemPrompt,
         quickPrompts,
       })
       onClose()

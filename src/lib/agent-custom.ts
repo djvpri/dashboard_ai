@@ -114,15 +114,21 @@ export async function simpanCustom(agentId: string, data: AgentCustom): Promise<
   if (data.emoji?.trim()) bersih.emoji = data.emoji.trim()
   if (data.description?.trim()) bersih.description = data.description.trim()
   if (data.systemPrompt?.trim()) bersih.systemPrompt = data.systemPrompt.trim()
-  if (Array.isArray(data.quickPrompts)) {
-    bersih.quickPrompts = data.quickPrompts.map(p => p.trim()).filter(Boolean)
-  }
+  // quickPrompts selalu disertakan (termasuk array kosong []) supaya
+  // ON CONFLICT DO UPDATE tidak melewatkan kolom ini
+  bersih.quickPrompts = Array.isArray(data.quickPrompts)
+    ? data.quickPrompts.map(p => p.trim()).filter(Boolean)
+    : []
 
-  await fetch('/api/agent-custom', {
+  const res = await fetch('/api/agent-custom', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ agentId, ...bersih }),
   })
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok || json.error) {
+    console.error('[simpanCustom] gagal:', json)
+  }
   cache.set(agentId, bersih)
   tulisCacheLS(cache)
   umumkanPerubahan()
