@@ -21,10 +21,36 @@ export interface AgentCustom {
 
 const EVENT = 'zd-agent-custom-changed'
 
-// Cache in-memory per sesi browser (bukan localStorage) — dihuni setelah
-// fetch pertama, dibaca komponen lain tanpa fetch berulang dalam load yang
-// sama. Sumber kebenaran tetap server; cache ini murni optimisasi.
-const cache = new Map<string, AgentCustom>()
+// Cache dua lapis: localStorage (sinkron, langsung tersedia saat mount) +
+// server (async, diperbarui setelah fetch). Pola ini menghilangkan
+// "kedipan" nama default yang muncul sebentar sebelum fetch server selesai.
+const LS_KEY = 'zd_agent_custom_cache'
+
+function bacaCacheLS(): Map<string, AgentCustom> {
+  const map = new Map<string, AgentCustom>()
+  if (typeof window === 'undefined') return map
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    if (raw) {
+      const obj = JSON.parse(raw) as Record<string, AgentCustom>
+      for (const [k, v] of Object.entries(obj)) map.set(k, v)
+    }
+  } catch {}
+  return map
+}
+
+function tulisCacheLS(map: Map<string, AgentCustom>) {
+  try {
+    const obj: Record<string, AgentCustom> = {}
+    for (const [k, v] of map.entries()) obj[k] = v
+    localStorage.setItem(LS_KEY, JSON.stringify(obj))
+  } catch {}
+}
+
+// Di-inisialisasi dari localStorage saat modul pertama di-import (sinkron)
+// sehingga useState initializer di hook langsung dapat nilai yang sudah
+// diketahui — tidak perlu tunggu fetch server.
+const cache: Map<string, AgentCustom> = bacaCacheLS()
 let sudahFetchSemua = false
 
 function dariItem(item: {
@@ -58,6 +84,9 @@ async function fetchSemua(): Promise<void> {
     for (const item of data.items ?? []) {
       cache.set(item.agentId, dariItem(item))
     }
+    // Simpan ke localStorage supaya render berikutnya tidak perlu tunggu
+    // fetch server lagi — nama kustom langsung tersedia saat mount.
+    tulisCacheLS(cache)
     sudahFetchSemua = true
   } catch {
     // Biarkan sudahFetchSemua tetap false -> percobaan berikutnya coba lagi.
@@ -81,12 +110,14 @@ export async function simpanCustom(agentId: string, data: AgentCustom): Promise<
     body: JSON.stringify({ agentId, ...bersih }),
   })
   cache.set(agentId, bersih)
+  tulisCacheLS(cache)
   umumkanPerubahan()
 }
 
 export async function resetCustom(agentId: string): Promise<void> {
   await fetch(`/api/agent-custom?agentId=${agentId}`, { method: 'DELETE' })
   cache.delete(agentId)
+  tulisCacheLS(cache)
   umumkanPerubahan()
 }
 
