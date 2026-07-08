@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
       const lastMsg = injectedMsgs[injectedMsgs.length - 1]
       const teks = (typeof lastMsg?.content === 'string' ? lastMsg.content : '').toLowerCase()
       const BASE = (process.env.NEXTAUTH_URL || 'http://localhost:3000').replace(/\/+$/, '')
+      console.log('[tool-injection] BASE:', BASE, '| teks:', teks.slice(0, 80))
 
       async function fetchTool(body: Record<string, unknown>): Promise<Record<string, unknown>> {
         const r = await fetch(`${BASE}/api/tools/devops`, {
@@ -87,16 +88,24 @@ export async function POST(req: NextRequest) {
 
       try {
         if (teks.includes('cek error') || teks.includes('error terbaru') || teks.includes('log zpos') || teks.includes('check error')) {
+          console.log('[tool-injection] action: check_errors')
           const d = await fetchTool({ action: 'check_errors', lines: 300 })
+          console.log('[tool-injection] result keys:', Object.keys(d), '| errorCount:', d.errorCount)
           inject(`[DATA RAILWAY ZPOS]\nStatus: ${d.deploymentStatus}\nError count: ${d.errorCount}\nErrors:\n${(d.errors as string[] || []).join('\n')}\n\nLog terbaru:\n${d.recentLogs}`)
         } else if (teks.includes('deployment') || teks.includes('deploy terakhir')) {
+          console.log('[tool-injection] action: get_deployments')
           const d = await fetchTool({ action: 'get_deployments' })
           inject(`[DEPLOYMENT ZPOS]\n${JSON.stringify(d.deployments, null, 2)}`)
         } else if (teks.includes('commit') || teks.includes('perubahan terakhir')) {
+          console.log('[tool-injection] action: get_commits')
           const d = await fetchTool({ action: 'get_commits' })
           inject(`[COMMIT TERAKHIR ZPOS]\n${(d.commits as { sha: string; date: string; author: string; message: string }[] || []).map(c => `${c.sha} | ${c.date?.slice(0, 10)} | ${c.author} | ${c.message}`).join('\n')}`)
+        } else {
+          console.log('[tool-injection] tidak ada kata kunci cocok')
         }
-      } catch { /* tool gagal — kirim pesan asli saja */ }
+      } catch (e) {
+        console.error('[tool-injection] gagal:', e instanceof Error ? e.message : e)
+      }
     }
 
     // Inject system prompt
