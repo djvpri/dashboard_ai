@@ -4,14 +4,7 @@ export const runtime = 'nodejs'
 
 const BASE = process.env.NEXTAUTH_URL || 'http://localhost:3000'
 
-// Endpoint ini dipanggil oleh Hermes Agent via tool call.
-// Hermes tidak perlu tahu detail Railway/GitHub API — cukup panggil
-// endpoint ini dengan action yang jelas.
-//
-// POST /api/tools/devops
-// { action: 'check_errors' | 'get_file' | 'list_files' | 'search_code' | 'create_pr' | 'get_commits', ...params }
-
-async function callInternal(path: string, opts: RequestInit = {}) {
+async function callInternal(path: string, opts: RequestInit = {}): Promise<Record<string, unknown>> {
   const res = await fetch(`${BASE}${path}`, {
     ...opts,
     headers: { 'Content-Type': 'application/json', ...opts.headers },
@@ -26,51 +19,53 @@ export async function POST(req: NextRequest) {
   try {
     switch (action) {
 
+      case 'projects': {
+        const data = await callInternal('/api/tools/railway?action=projects')
+        return NextResponse.json(data)
+      }
+
       case 'check_errors': {
-        // Ambil log Railway + highlight error
         const lines = body.lines || 300
         const data = await callInternal(`/api/tools/railway?action=logs&lines=${lines}`)
         if (data.error) return NextResponse.json({ error: data.error }, { status: 500 })
-
-        const summary = {
-          deploymentStatus: data.deployment?.status,
-          deploymentTime: data.deployment?.createdAt,
+        return NextResponse.json({
+          deploymentStatus: data.deployment ? (data.deployment as Record<string,unknown>).status : 'unknown',
+          deploymentTime: data.deployment ? (data.deployment as Record<string,unknown>).createdAt : null,
           totalLogLines: data.totalLines,
-          errorCount: data.errors?.length ?? 0,
-          errors: data.errors?.slice(0, 20), // maks 20 error lines
-          // Sertakan 100 baris log terakhir untuk konteks
-          recentLogs: data.logs?.split('\n').slice(-100).join('\n'),
-        }
-        return NextResponse.json(summary)
+          errorCount: data.errorCount,
+          errors: data.errors,
+          recentLogs: data.recentLogs,
+        })
       }
 
       case 'get_deployments': {
-        return callInternal('/api/tools/railway?action=deployments')
-      }
-
-      case 'projects': {
-        return callInternal('/api/tools/railway?action=projects')
+        const data = await callInternal('/api/tools/railway?action=deployments')
+        return NextResponse.json(data)
       }
 
       case 'get_file': {
         const { path: filePath } = body
         if (!filePath) return NextResponse.json({ error: 'path wajib diisi' }, { status: 400 })
-        return callInternal(`/api/tools/github?action=file&path=${encodeURIComponent(filePath)}`)
+        const data = await callInternal(`/api/tools/github?action=file&path=${encodeURIComponent(filePath)}`)
+        return NextResponse.json(data)
       }
 
       case 'list_files': {
         const { path: dirPath = '' } = body
-        return callInternal(`/api/tools/github?action=list&path=${encodeURIComponent(dirPath)}`)
+        const data = await callInternal(`/api/tools/github?action=list&path=${encodeURIComponent(dirPath)}`)
+        return NextResponse.json(data)
       }
 
       case 'search_code': {
         const { query } = body
         if (!query) return NextResponse.json({ error: 'query wajib diisi' }, { status: 400 })
-        return callInternal(`/api/tools/github?action=search&q=${encodeURIComponent(query)}`)
+        const data = await callInternal(`/api/tools/github?action=search&q=${encodeURIComponent(query)}`)
+        return NextResponse.json(data)
       }
 
       case 'get_commits': {
-        return callInternal('/api/tools/github?action=commits')
+        const data = await callInternal('/api/tools/github?action=commits')
+        return NextResponse.json(data)
       }
 
       case 'create_pr': {
@@ -78,16 +73,17 @@ export async function POST(req: NextRequest) {
         if (!title || !branch || !files?.length) {
           return NextResponse.json({ error: 'title, branch, files wajib diisi' }, { status: 400 })
         }
-        return callInternal('/api/tools/github', {
+        const data = await callInternal('/api/tools/github', {
           method: 'POST',
           body: JSON.stringify({ action: 'pr', title, prBody, branch, files }),
         })
+        return NextResponse.json(data)
       }
 
       default:
         return NextResponse.json({
           error: `Action '${action}' tidak dikenal`,
-          available: ['check_errors', 'get_deployments', 'get_file', 'list_files', 'search_code', 'get_commits', 'create_pr'],
+          available: ['projects', 'check_errors', 'get_deployments', 'get_file', 'list_files', 'search_code', 'get_commits', 'create_pr'],
         }, { status: 400 })
     }
   } catch (err) {
@@ -96,18 +92,18 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET /api/tools/devops — info tools yang tersedia (untuk Hermes)
 export async function GET() {
   return NextResponse.json({
-    description: 'DevOps tools untuk ZPOS (djvpri/zpos di Railway)',
+    description: 'DevOps tools untuk ekosistem Zomet di Railway',
     tools: [
-      { action: 'check_errors', desc: 'Ambil log Railway terbaru + daftar error lines', params: { lines: 'jumlah baris log (default 300)' } },
-      { action: 'get_deployments', desc: 'Status 5 deployment terakhir ZPOS' },
-      { action: 'get_file', desc: 'Baca isi file dari repo GitHub', params: { path: 'path file, mis. src/app/page.tsx' } },
-      { action: 'list_files', desc: 'List file/folder di repo', params: { path: 'folder, kosong = root' } },
-      { action: 'search_code', desc: 'Cari kode di repo ZPOS', params: { query: 'kata kunci pencarian' } },
-      { action: 'get_commits', desc: '10 commit terakhir di repo ZPOS' },
-      { action: 'create_pr', desc: 'Buat PR dengan proposed fix', params: { title: 'judul PR', prBody: 'deskripsi', branch: 'nama branch baru', files: '[{path, content}]' } },
+      { action: 'projects', desc: 'Status semua project Railway' },
+      { action: 'check_errors', desc: 'Log + error ZPOS terbaru', params: { lines: 300 } },
+      { action: 'get_deployments', desc: '5 deployment terakhir ZPOS' },
+      { action: 'get_file', desc: 'Baca file dari repo ZPOS', params: { path: 'src/...' } },
+      { action: 'list_files', desc: 'List folder repo ZPOS', params: { path: '' } },
+      { action: 'search_code', desc: 'Cari kode di repo ZPOS', params: { query: '...' } },
+      { action: 'get_commits', desc: '10 commit terakhir ZPOS' },
+      { action: 'create_pr', desc: 'Buat PR fix', params: { title: '', branch: '', files: [] } },
     ],
   })
 }
