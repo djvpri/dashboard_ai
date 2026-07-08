@@ -121,6 +121,45 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    if (action === 'projects') {
+      const data = await gql(`
+        query {
+          projects(first: 50) {
+            edges {
+              node {
+                id name
+                services {
+                  edges {
+                    node {
+                      id name
+                      deployments(first: 1) {
+                        edges {
+                          node { id status createdAt }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `)
+      const projects = data.projects?.edges?.map((p: any) => {
+        const services = p.node.services?.edges
+          ?.filter((s: any) => !['postgres','postgresql','redis','mysql'].includes(s.node.name.toLowerCase()))
+          ?.map((s: any) => ({
+            id: s.node.id,
+            name: s.node.name,
+            status: s.node.deployments?.edges?.[0]?.node?.status ?? 'NO_DEPLOY',
+            deployedAt: s.node.deployments?.edges?.[0]?.node?.createdAt ?? null,
+            deploymentId: s.node.deployments?.edges?.[0]?.node?.id ?? null,
+          })) ?? []
+        return { id: p.node.id, name: p.node.name, services }
+      }) ?? []
+      return NextResponse.json({ projects })
+    }
+
     if (action === 'status') {
       const data = await gql(`
         query($projectId: String!) {
