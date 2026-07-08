@@ -87,7 +87,21 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        if (teks.includes('cek error') || teks.includes('error terbaru') || teks.includes('log zpos') || teks.includes('check error')) {
+        if (teks.includes('semua project') || teks.includes('semua app') || teks.includes('scan railway') || teks.includes('status semua') || teks.includes('cek semua')) {
+          console.log('[tool-injection] action: projects')
+          const d = await fetchTool({ action: 'projects' })
+          const failed = (d.projects as any[] || []).flatMap((p: any) =>
+            p.services.filter((s: any) => s.status === 'FAILED').map((s: any) =>
+              `❌ ${p.name} / ${s.name} (deploy: ${s.deployedAt?.slice(0,10)})`
+            )
+          )
+          const success = (d.projects as any[] || []).flatMap((p: any) =>
+            p.services.filter((s: any) => s.status === 'SUCCESS').map((s: any) =>
+              `✅ ${p.name} / ${s.name}`
+            )
+          )
+          inject(`[STATUS SEMUA PROJECT RAILWAY]\n\nFAILED (${failed.length}):\n${failed.join('\n') || 'tidak ada'}\n\nSUCCESS (${success.length}):\n${success.join('\n')}`)
+        } else if (teks.includes('cek error') || teks.includes('error terbaru') || teks.includes('log zpos') || teks.includes('check error')) {
           console.log('[tool-injection] action: check_errors')
           const d = await fetchTool({ action: 'check_errors', lines: 300 })
           console.log('[tool-injection] result keys:', Object.keys(d), '| errorCount:', d.errorCount)
