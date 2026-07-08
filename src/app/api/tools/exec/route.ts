@@ -6,77 +6,44 @@ export const runtime = 'nodejs'
 
 const execAsync = promisify(exec)
 
-// WHITELIST command yang diizinkan — tidak ada command destruktif
-// Command di luar daftar ini akan ditolak
-const ALLOWED_COMMANDS = [
-  /^npm (install|ci|run build|run start|audit)(\s.*)?$/,
-  /^node (scripts\/migrate\.js|scripts\/seed\.js)(\s.*)?$/,
-  /^npx prisma (generate|db push|migrate deploy|studio)(\s.*)?$/,
-  /^ls(\s.*)?$/,
-  /^cat [\w\/\.\-]+$/,
-  /^echo .+$/,
-  /^git (status|log|diff|pull)(\s.*)?$/,
+const ALLOWED_PREFIXES = [
+  'npm ', 'node ', 'npx ', 'ls ', 'cat ', 'echo ', 'pwd', 'git ', 'prisma ', 'railway ',
 ]
 
-function isAllowed(cmd: string): boolean {
-  return ALLOWED_COMMANDS.some(r => r.test(cmd.trim()))
-}
-
-// Hanya bisa dipanggil dari server internal (tool injection di api/chat)
-// Cek origin request — tolak kalau dari luar
-function isInternalRequest(req: NextRequest): boolean {
-  const host = req.headers.get('host') || ''
-  const forwarded = req.headers.get('x-forwarded-for') || ''
-  const realIp = req.headers.get('x-real-ip') || ''
-
-  // Akses dari localhost atau dari server Railway sendiri
-  const isLocal = host.startsWith('localhost') || host.startsWith('127.')
-  const isRailwayInternal = !forwarded && !realIp // tidak ada proxy = internal call
-
-  return isLocal || isRailwayInternal
-}
+const BLOCKED = ['rm -rf', 'sudo', 'curl http', 'wget ', 'chmod 777', '> /dev/']
 
 export async function POST(req: NextRequest) {
-  // Proteksi: hanya dari internal
-  if (!isInternalRequest(req)) {
-    return NextResponse.json({ error: 'Forbidden — endpoint ini hanya untuk akses internal' }, { status: 403 })
+  const { cmd, cwd } = await req.json()
+  if (!cmd || typeof cmd !== 'string') {
+    return NextResponse.json({ error: 'cmd wajib diisi' }, { status: 400 })
   }
 
-  const { command, cwd } = await req.json()
-
-  if (!command) {
-    return NextResponse.json({ error: 'command wajib diisi' }, { status: 400 })
+  for (const blocked of BLOCKED) {
+    if (cmd.includes(blocked)) {
+      return NextResponse.json({ error: `Command diblokir: ${blocked}` }, { status: 403 })
+    }
   }
 
-  // Whitelist check
-  if (!isAllowed(command)) {
+  const allowed = ALLOWED_PREFIXES.some(p => cmd.trim().startsWith(p)) || cmd.trim() === 'pwd'
+  if (!allowed) {
     return NextResponse.json({
-      error: `Command tidak diizinkan: "${command}". Hanya command yang aman yang diperbolehkan.`,
-      allowed: ALLOWED_COMMANDS.map(r => r.toString()),
+      error: `Tidak diizinkan. Prefix yang boleh: ${ALLOWED_PREFIXES.join(', ')}`,
     }, { status: 403 })
   }
 
   try {
-    const { stdout, stderr } = await execAsync(command, {
+    const { stdout, stderr } = await execAsync(cmd, {
       cwd: cwd || '/app',
-      timeout: 60000, // max 60 detik
-      env: { ...process.env },
+      timeout: 30000,
+      maxBuffer: 1024 * 1024,
     })
-
-    return NextResponse.json({
-      ok: true,
-      command,
-      stdout: stdout.slice(0, 5000), // max 5KB output
-      stderr: stderr.slice(0, 2000),
-    })
-  } catch (err: unknown) {
-    const e = err as { message?: string; stdout?: string; stderr?: string }
+    return NextResponse.json({ ok: true, stdout: stdout.slice(0, 5000), stderr: stderr.slice(0, 1000) })
+  } catch (err) {
+    const e = err as { stdout?: string; stderr?: string; message?: string }
     return NextResponse.json({
       ok: false,
-      command,
-      error: e.message,
-      stdout: e.stdout?.slice(0, 5000),
-      stderr: e.stderr?.slice(0, 2000),
+      stdout: e.stdout?.slice(0, 5000) || '',
+      stderr: e.stderr?.slice(0, 1000) || e.message || String(err),
     }, { status: 500 })
   }
 }

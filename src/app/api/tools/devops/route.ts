@@ -56,6 +56,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(data)
       }
 
+      case 'exec': {
+        const { cmd, cwd } = body
+        if (!cmd) return NextResponse.json({ error: 'cmd wajib diisi' }, { status: 400 })
+        const data = await callInternal('/api/tools/exec', {
+          method: 'POST',
+          body: JSON.stringify({ cmd, cwd }),
+        })
+        return NextResponse.json(data)
+      }
+
       case 'projects': {
         const data = await callInternal('/api/tools/railway?action=projects')
         return NextResponse.json(data)

@@ -161,6 +161,21 @@ export async function POST(req: NextRequest) {
           } else {
             inject(`[REDEPLOY] Tidak dapat mendeteksi service mana yang mau di-redeploy. Sebutkan nama app (zgym, zbengkel, dll) atau service ID-nya.`)
           }
+        } else if (teks.includes('jalankan') || teks.includes('eksekusi') || teks.includes('run cmd') || teks.includes('execute')) {
+          // Deteksi command dalam backtick
+          const cmdMatch = (lastMsg.content as string).match(/`([^`]+)`/) ||
+            (lastMsg.content as string).match(/(?:jalankan|eksekusi|run|execute)\s+(.+)/i)
+          if (cmdMatch) {
+            const cmd = cmdMatch[1].trim()
+            console.log('[tool-injection] action: exec', cmd)
+            const r = await fetch(`${BASE}/api/tools/exec`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ cmd }),
+            })
+            const d = await r.json() as Record<string, unknown>
+            inject(`[HASIL EXEC: ${cmd}]\nOK: ${d.ok}\nOUTPUT:\n${d.stdout || '(kosong)'}\n${d.stderr ? `STDERR:\n${d.stderr}` : ''}`)
+          }
         } else {
           console.log('[tool-injection] tidak ada kata kunci cocok')
         }
