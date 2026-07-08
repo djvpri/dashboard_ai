@@ -91,8 +91,24 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        if (teks.includes('semua project') || teks.includes('semua app') || 
-            teks.includes('scan railway') || teks.includes('status semua') || 
+        // Deteksi UUID deployment di pesan — fetch log langsung kalau ada UUID
+        const uuidRegex = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi
+        const uuids = (typeof lastMsg.content === 'string' ? lastMsg.content : '').match(uuidRegex) || []
+        const depId = uuids[0]
+
+        if (depId && (teks.includes('log') || teks.includes('ambil') || teks.includes('error') || teks.includes('cek'))) {
+          console.log('[tool-injection] action: logs by deploymentId', depId)
+          const BASE2 = (process.env.NEXTAUTH_URL || 'http://localhost:3000').replace(/\/+$/, '')
+          const r = await fetch(`${BASE2}/api/tools/railway?action=logs&deploymentId=${depId}`)
+          const d = await r.json() as Record<string, unknown>
+          if (d.error) {
+            inject(`[LOG ERROR] Gagal ambil log deployment ${depId.slice(0,8)}: ${d.error}`)
+          } else {
+            const errors = d.errors as string[] || []
+            inject(`[LOG DEPLOYMENT ${depId.slice(0,8)}...]\nTotal lines: ${d.totalLines}\nError count: ${d.errorCount}\n\n${errors.length > 0 ? `ERRORS:\n${errors.slice(0,20).join('\n')}\n\n` : 'Tidak ada error.\n\n'}LOG TERBARU:\n${d.recentLogs || '(kosong)'}`)
+          }
+        } else if (teks.includes('semua project') || teks.includes('semua app') ||
+            teks.includes('scan railway') || teks.includes('status semua') ||
             teks.includes('cek semua') || teks.includes('all project') ||
             teks.includes('railway status') || teks.includes('project railway') ||
             (teks.includes('railway') && teks.includes('status')) ||
