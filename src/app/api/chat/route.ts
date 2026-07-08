@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     // dan tidak bisa langsung akses endpoint /api/tools/devops.
     let injectedMsgs = messages || []
     let injectedSystemPrompt: string | undefined
-    if (agentId === 'hermes' && injectedMsgs.length > 0) {
+    if (injectedMsgs.length > 0) {
       const lastMsg = injectedMsgs[injectedMsgs.length - 1]
       const teks = (typeof lastMsg?.content === 'string' ? lastMsg.content : '').toLowerCase()
       const BASE = (process.env.NEXTAUTH_URL || 'http://localhost:3000').replace(/\/+$/, '')
