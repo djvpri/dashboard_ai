@@ -3,7 +3,10 @@ import type { NextRequest } from 'next/server'
 import { verifySessionToken, AUTH_COOKIE } from '@/lib/auth-server'
 
 // Routes that don't need auth
-const PUBLIC_ROUTES = ['/login', '/api/login']
+// /api/tools/* diakses secara internal dari server (tool injection di
+// api/chat/route.ts) tanpa cookie session — harus publik tapi aman karena
+// token Railway/GitHub ada di env var server, tidak diekspos ke client
+const PUBLIC_ROUTES = ['/login', '/api/login', '/api/tools']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
