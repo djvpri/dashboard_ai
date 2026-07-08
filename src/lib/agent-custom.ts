@@ -47,11 +47,20 @@ function tulisCacheLS(map: Map<string, AgentCustom>) {
   } catch {}
 }
 
-// Di-inisialisasi dari localStorage saat modul pertama di-import (sinkron)
-// sehingga useState initializer di hook langsung dapat nilai yang sudah
-// diketahui — tidak perlu tunggu fetch server.
-const cache: Map<string, AgentCustom> = bacaCacheLS()
+// Inisialisasi cache: kosong dulu (aman untuk SSR), diisi dari localStorage
+// hanya setelah dipastikan berjalan di browser (typeof window !== 'undefined').
+// Tidak bisa langsung panggil bacaCacheLS() di level modul karena modul ini
+// dieksekusi di server saat SSR/hydration — localStorage tidak ada di sana.
+const cache: Map<string, AgentCustom> = new Map()
+let cacheInited = false
 let sudahFetchSemua = false
+
+function initCacheKalauBelum() {
+  if (cacheInited || typeof window === 'undefined') return
+  cacheInited = true
+  // Baca dari localStorage ke cache in-memory
+  for (const [k, v] of bacaCacheLS().entries()) cache.set(k, v)
+}
 
 function dariItem(item: {
   name?: string; emoji?: string; description?: string; systemPrompt?: string
@@ -131,7 +140,10 @@ export function gabungkanAgent(dasar: Agent, custom: AgentCustom): Agent {
 // sebelumnya yang synchronous (di situ useSyncExternalStore yang tepat).
 export function useAgentTampil(agentId: string): Agent | undefined {
   const dasar = getAgent(agentId)
-  const [custom, setCustom] = useState<AgentCustom>(() => cache.get(agentId) ?? {})
+  const [custom, setCustom] = useState<AgentCustom>(() => {
+    initCacheKalauBelum()
+    return cache.get(agentId) ?? {}
+  })
 
   useEffect(() => {
     let batal = false
@@ -150,7 +162,10 @@ export function useAgentTampil(agentId: string): Agent | undefined {
 
 // Hook: semua agent dengan kustomisasi diterapkan (dipakai Sidebar).
 export function useSemuaAgentTampil(): Agent[] {
-  const [, setTick] = useState(0)
+  // initCacheKalauBelum() dipanggil di useState initializer supaya berjalan
+  // sinkron sebelum render pertama — setState di render tidak boleh, tapi
+  // membaca/mengisi cache (side effect ringan tanpa setState) aman di sini.
+  const [, setTick] = useState(() => { initCacheKalauBelum(); return 0 })
 
   useEffect(() => {
     let batal = false
