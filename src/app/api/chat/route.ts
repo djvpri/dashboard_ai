@@ -87,7 +87,12 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        if (teks.includes('semua project') || teks.includes('semua app') || teks.includes('scan railway') || teks.includes('status semua') || teks.includes('cek semua')) {
+        if (teks.includes('semua project') || teks.includes('semua app') || 
+            teks.includes('scan railway') || teks.includes('status semua') || 
+            teks.includes('cek semua') || teks.includes('all project') ||
+            teks.includes('railway status') || teks.includes('project railway') ||
+            (teks.includes('railway') && teks.includes('status')) ||
+            (teks.includes('railway') && teks.includes('semua'))) {
           console.log('[tool-injection] action: projects')
           const d = await fetchTool({ action: 'projects' })
           const failed = (d.projects as any[] || []).flatMap((p: any) =>
