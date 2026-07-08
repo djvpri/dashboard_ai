@@ -308,8 +308,8 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Quick prompts — muncul saat chat baru/hanya ada sapaan awal */}
-      {messages.length <= 1 && quickPrompts.length > 0 && (
+      {/* Quick prompts — muncul saat chat baru ATAU saat input kosong */}
+      {(messages.length <= 1 || input === '') && quickPrompts.length > 0 && (
         <QuickPrompts
           prompts={quickPrompts}
           onSelect={(p) => setInput(p)}
