@@ -146,20 +146,22 @@ export function gabungkanAgent(dasar: Agent, custom: AgentCustom): Agent {
 }
 
 // Hook: agent tunggal dengan kustomisasi diterapkan.
-// useEffect+useState di sini SESUAI (bukan pelanggaran pola) — ini benar-
-// benar async data fetching dari server, beda dengan versi localStorage
-// sebelumnya yang synchronous (di situ useSyncExternalStore yang tepat).
 export function useAgentTampil(agentId: string): Agent | undefined {
   const dasar = getAgent(agentId)
-  const [custom, setCustom] = useState<AgentCustom>(() => {
-    initCacheKalauBelum()
-    return cache.get(agentId) ?? {}
-  })
+  // Render pertama (SSR + hydration client) SELALU pakai {} supaya output
+  // server dan client identik → tidak ada hydration mismatch.
+  // Cache dari localStorage/server diterapkan setelah mount via useEffect.
+  const [custom, setCustom] = useState<AgentCustom>({})
 
   useEffect(() => {
+    // Inisialisasi cache dari localStorage (sinkron) setelah mount
+    initCacheKalauBelum()
     let batal = false
+    // Langsung pakai nilai dari cache LS kalau ada, sambil fetch server
+    const cached = cache.get(agentId)
+    if (cached) setCustom(cached)
     fetchSatu(agentId).then((c) => { if (!batal) setCustom(c) })
-    const perbarui = () => setCustom(cache.get(agentId) ?? {})
+    const perbarui = () => { if (!batal) setCustom(cache.get(agentId) ?? {}) }
     window.addEventListener(EVENT, perbarui)
     return () => {
       batal = true
@@ -173,15 +175,21 @@ export function useAgentTampil(agentId: string): Agent | undefined {
 
 // Hook: semua agent dengan kustomisasi diterapkan (dipakai Sidebar).
 export function useSemuaAgentTampil(): Agent[] {
-  // initCacheKalauBelum() dipanggil di useState initializer supaya berjalan
-  // sinkron sebelum render pertama — setState di render tidak boleh, tapi
-  // membaca/mengisi cache (side effect ringan tanpa setState) aman di sini.
-  const [, setTick] = useState(() => { initCacheKalauBelum(); return 0 })
+  // Render pertama selalu pakai agents default (tanpa kustom) — konsisten
+  // server & client. Kustom diterapkan setelah mount via useEffect.
+  const [daftar, setDaftar] = useState<Agent[]>(agents)
 
   useEffect(() => {
+    initCacheKalauBelum()
     let batal = false
-    fetchSemua().then(() => { if (!batal) setTick((t) => t + 1) })
-    const perbarui = () => setTick((t) => t + 1)
+    // Terapkan cache LS langsung (sinkron) sebelum fetch server selesai
+    setDaftar(agents.map((a) => gabungkanAgent(a, cache.get(a.id) ?? {})))
+    fetchSemua().then(() => {
+      if (!batal) setDaftar(agents.map((a) => gabungkanAgent(a, cache.get(a.id) ?? {})))
+    })
+    const perbarui = () => {
+      if (!batal) setDaftar(agents.map((a) => gabungkanAgent(a, cache.get(a.id) ?? {})))
+    }
     window.addEventListener(EVENT, perbarui)
     return () => {
       batal = true
@@ -189,7 +197,7 @@ export function useSemuaAgentTampil(): Agent[] {
     }
   }, [])
 
-  return agents.map((a) => gabungkanAgent(a, cache.get(a.id) ?? {}))
+  return daftar
 }
 
 // Nilai FRESH langsung dari server (bukan cache) — dipakai AgentEditModal
