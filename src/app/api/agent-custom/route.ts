@@ -12,6 +12,14 @@ interface CustomRow {
   quick_prompts: string[] | null
 }
 
+function parseQuickPrompts(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw
+  if (typeof raw === 'string') {
+    try { const p = JSON.parse(raw); return Array.isArray(p) ? p : [] } catch { return [] }
+  }
+  return []
+}
+
 function keCamel(row: CustomRow) {
   return {
     agentId: row.agent_id,
@@ -19,7 +27,7 @@ function keCamel(row: CustomRow) {
     emoji: row.emoji ?? undefined,
     description: row.description ?? undefined,
     systemPrompt: row.system_prompt ?? undefined,
-    quickPrompts: Array.isArray(row.quick_prompts) ? row.quick_prompts : [],
+    quickPrompts: parseQuickPrompts(row.quick_prompts),
   }
 }
 
