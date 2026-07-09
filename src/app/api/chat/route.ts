@@ -90,16 +90,49 @@ export async function POST(req: NextRequest) {
           `\n\n=== DATA REAL-TIME (SUDAH DIAMBIL OTOMATIS) ===\n${konteks}\n=== ANALISIS DATA DI ATAS DAN JAWAB PERTANYAAN USER ===`
       }
 
+      // Mapping nama app ke service/deployment info Railway
+      const PROJECT_MAP: Record<string, { serviceId: string; environmentId?: string }> = {
+        zgym: { serviceId: '794b65a8-e57d-4c46-bf56-591e1ac4ed4d' },
+        zbengkel: { serviceId: '54e596fe-2661-41ea-ba37-a60576e0febd' },
+        zresto: { serviceId: 'cba1d12b-9d7b-4639-90f6-193481f985b9' },
+        'z-resto': { serviceId: 'cba1d12b-9d7b-4639-90f6-193481f985b9' },
+        zpos: { serviceId: 'f026c44d-60cd-4bb8-a277-a3cd9dec70a7', environmentId: 'eea0eae9-23a7-4611-845f-9cb6176cceaa' },
+        ztransport: { serviceId: 'f6d82f7e-95df-4dc3-9557-eada4fd91d01' },
+        zbarber: { serviceId: 'a1421b59-15d6-4e14-ac47-0fe86c11f680' },
+        zlaundry: { serviceId: '1b28fb66-ec11-401f-bd4f-a7a5a08bef14' },
+        zgold: { serviceId: '2db9e52a-151d-4fc4-bdc8-64920178b905' },
+        zsnap: { serviceId: '42d1e830-34a7-4576-8a95-49e28154d14e' },
+        zrooms: { serviceId: '875a329d-42e4-42bf-b3ae-502fa0b3c19f' },
+        zabsen: { serviceId: '1717e12b-37a1-449e-ab4a-1daf5570589c' },
+        zwisata: { serviceId: '2db9b3b2-f8d1-4a15-9e73-31b890fd2d36' },
+        zprint: { serviceId: 'a9a8b39f-f37f-4472-9b0d-d8a678ffb0b9' },
+        zbilliar: { serviceId: '2752c6d3-2fb5-4dcf-9f35-e6bd6c5e8bcf' },
+        zbackup: { serviceId: '1d77c012-2b66-49b6-8baf-04e6479174fb' },
+        zmedics: { serviceId: '30251778-8c94-4dbf-a3e6-9354ea6b9229' },
+        zadv: { serviceId: 'f8fd5b13-ecfd-46e3-9825-abd9ef53b897' },
+        zone: { serviceId: '08660f3f-5e4a-4e68-aded-eee7d79483f3' },
+      }
+      const appKey = Object.keys(PROJECT_MAP).find(k => teks.includes(k))
+
       try {
-        // Deteksi UUID deployment di pesan — fetch log langsung kalau ada UUID
         const uuidRegex = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi
         const uuids = (typeof lastMsg.content === 'string' ? lastMsg.content : '').match(uuidRegex) || []
         const depId = uuids[0]
 
-        if (depId && (teks.includes('log') || teks.includes('ambil') || teks.includes('error') || teks.includes('cek'))) {
-          console.log('[tool-injection] action: logs by deploymentId', depId)
+        const isLogRequest = teks.includes('log') || teks.includes('error') || teks.includes('cek error') || teks.includes('ambil log')
+
+        if (isLogRequest && (depId || appKey)) {
+          // Fetch log via deployment ID atau service ID dari nama app
           const BASE2 = (process.env.NEXTAUTH_URL || 'http://localhost:3000').replace(/\/+$/, '')
-          const r = await fetch(`${BASE2}/api/tools/railway?action=logs&deploymentId=${depId}`)
+          let url = `${BASE2}/api/tools/railway?action=logs`
+          if (depId) {
+            url += `&deploymentId=${depId}`
+            console.log('[tool-injection] action: logs by deploymentId', depId)
+          } else if (appKey) {
+            url += `&serviceId=${PROJECT_MAP[appKey].serviceId}`
+            console.log('[tool-injection] action: logs by app', appKey)
+          }
+          const r = await fetch(url)
           const d = await r.json() as Record<string, unknown>
           if (d.error) {
             inject(`[LOG ERROR] Gagal ambil log deployment ${depId.slice(0,8)}: ${d.error}`)
