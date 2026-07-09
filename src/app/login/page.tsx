@@ -43,7 +43,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <form onSubmit={handleSubmit} className="bg-zinc-900 rounded-2xl p-6 sm:p-8 border border-zinc-800 space-y-6">
           <div className="text-center">
-            <h1 className="text-4xl sm:text-3xl mb-1">🔐</h1>
+            <h1 className="text-4xl sm:text-3xl mb-1"><i className="bi bi-lock"></i></h1>
             <h2 className="text-xl sm:text-2xl font-semibold text-white">Z-Dashboard</h2>
             <p className="text-sm text-zinc-500 mt-1">Masukkan password</p>
           </div>

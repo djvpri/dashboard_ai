@@ -163,7 +163,7 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
       while (percobaan < MAX_RETRY && !berhasil) {
         if (percobaan > 0) {
           // Tampilkan info retry supaya user tahu sedang dicoba ulang
-          setStreamingContent(`⟳ Mencoba ulang (${percobaan}/${MAX_RETRY - 1})...`)
+          setStreamingContent(`[⟳] Mencoba ulang (${percobaan}/${MAX_RETRY - 1})...`)
           await new Promise(r => setTimeout(r, DELAY_MS[percobaan - 1]))
           setStreamingContent('')
           full = ''
@@ -199,7 +199,7 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
         // Semua retry gagal — tampilkan pesan error yang informatif
         setMessages((prev) => [
           ...prev,
-          { role: 'assistant', content: `⚠️ Tidak ada respon setelah ${MAX_RETRY}x percobaan. Gateway mungkin sibuk, coba lagi sebentar.` },
+          { role: 'assistant', content: `[!] Tidak ada respon setelah ${MAX_RETRY}x percobaan. Gateway mungkin sibuk, coba lagi sebentar.` },
         ])
       }
     } catch (err) {
@@ -207,7 +207,7 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
       const pesan = err instanceof Error ? err.message : String(err)
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: `⚠️ Error: ${pesan}` },
+        { role: 'assistant', content: `[!] Error: ${pesan}` },
       ])
     } finally {
       setLoading(false)
@@ -245,7 +245,7 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
             title="Hapus riwayat chat"
             aria-label="Hapus riwayat chat"
           >
-            🗑️
+            <i className="bi bi-trash3"></i>
           </button>
         </div>
       </div>
@@ -332,7 +332,7 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
                   className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-400"
                   aria-label={`Hapus gambar ${i + 1}`}
                 >
-                  ×
+                  <i className="bi bi-x"></i>
                 </button>
               </div>
             ))}
@@ -350,7 +350,7 @@ export default function ChatWindow({ agent: agentDasar }: ChatWindowProps) {
             title="Upload gambar"
             aria-label="Upload gambar"
           >
-            📷
+            <i className="bi bi-camera"></i>
           </button>
           <input
             ref={fileInputRef}

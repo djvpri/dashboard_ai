@@ -62,7 +62,7 @@ export default function ChatTabs({ agents, activeId, onSwitch }: ChatTabsProps) 
           className="fixed left-0 top-0 h-11 w-10 flex items-center justify-center bg-gradient-to-r from-zinc-950 to-transparent z-10 text-zinc-400 hover:text-white transition-colors"
           aria-label="Scroll tabs left"
         >
-          ←
+          <i className="bi bi-chevron-left"></i>
         </button>
       )}
 
@@ -109,7 +109,7 @@ export default function ChatTabs({ agents, activeId, onSwitch }: ChatTabsProps) 
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-500 hover:text-white hover:bg-zinc-800/50 transition-colors shrink-0"
           aria-label="New chat"
         >
-          <span className="text-lg">+</span>
+          <i className="bi bi-plus-lg text-lg"></i>
           <span className="hidden sm:inline">New</span>
         </button>
       </div>
@@ -121,7 +121,7 @@ export default function ChatTabs({ agents, activeId, onSwitch }: ChatTabsProps) 
           className="fixed right-0 top-0 h-11 w-10 flex items-center justify-center bg-gradient-to-l from-zinc-950 to-transparent z-10 text-zinc-400 hover:text-white transition-colors"
           aria-label="Scroll tabs right"
         >
-          →
+          <i className="bi bi-chevron-right"></i>
         </button>
       )}
     </div>

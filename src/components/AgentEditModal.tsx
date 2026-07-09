@@ -80,7 +80,7 @@ export default function AgentEditModal({ agentId, onClose }: Props) {
       >
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-white">Edit Agent</h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white text-xl leading-none">×</button>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white text-xl leading-none"><i className="bi bi-x"></i></button>
         </div>
 
         {loading ? (
@@ -149,7 +149,7 @@ export default function AgentEditModal({ agentId, onClose }: Props) {
                     <button
                       onClick={() => setQuickPrompts(quickPrompts.filter((_, j) => j !== i))}
                       className="text-zinc-500 hover:text-red-400 transition-colors text-lg leading-none px-1"
-                    >×</button>
+                    ><i className="bi bi-x"></i></button>
                   </div>
                 ))}
                 {quickPrompts.length < 6 && (
@@ -157,7 +157,7 @@ export default function AgentEditModal({ agentId, onClose }: Props) {
                     onClick={() => setQuickPrompts([...quickPrompts, ''])}
                     className="text-xs text-zinc-500 hover:text-indigo-400 transition-colors flex items-center gap-1"
                   >
-                    <span className="text-base">+</span> Tambah template
+                    <i className="bi bi-plus text-base"></i> Tambah template
                   </button>
                 )}
               </div>

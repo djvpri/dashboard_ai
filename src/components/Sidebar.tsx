@@ -80,7 +80,7 @@ export default function Sidebar({ activeId, onSwitchAgent, agents, onEditAgent }
           className="lg:hidden fixed top-4 left-4 z-30 p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white shadow-lg"
           aria-label="Buka sidebar"
         >
-          ☰
+          <i className="bi bi-list text-xl"></i>
         </button>
       )}
 
@@ -95,10 +95,10 @@ export default function Sidebar({ activeId, onSwitchAgent, agents, onEditAgent }
 
         <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl">🤖</span>
+            <i className="bi bi-robot text-xl"></i>
             <span className="font-semibold text-white">Z-Dashboard</span>
           </Link>
-          <button onClick={() => setOpen(false)} className="lg:hidden p-2 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800" aria-label="Tutup sidebar">✕</button>
+          <button onClick={() => setOpen(false)} className="lg:hidden p-2 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800" aria-label="Tutup sidebar"><i className="bi bi-x"></i></button>
         </div>
 
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
@@ -138,7 +138,7 @@ export default function Sidebar({ activeId, onSwitchAgent, agents, onEditAgent }
                   title={`Edit ${tampil.name}`}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity lg:opacity-100"
                 >
-                  ✏️
+                  <i className="bi bi-pencil"></i>
                 </button>
               </div>
             )
@@ -149,7 +149,7 @@ export default function Sidebar({ activeId, onSwitchAgent, agents, onEditAgent }
             onClick={() => { onSwitchAgent('new'); setOpen(false) }}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg w-full text-left text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors border border-dashed border-zinc-700 hover:border-zinc-500 mt-2"
           >
-            <span className="text-lg">➕</span>
+            <i className="bi bi-plus-lg text-lg"></i>
             <span className="text-sm font-medium">Tambah agent baru</span>
           </button>
         </nav>
