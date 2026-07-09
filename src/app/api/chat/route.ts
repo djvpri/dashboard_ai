@@ -84,10 +84,15 @@ export async function POST(req: NextRequest) {
       }
 
       function inject(konteks: string) {
-        // Inject ke system prompt supaya Hermes memprioritaskan data ini
-        // sebagai konteks resmi, bukan pesan user biasa yang bisa diabaikan
-        injectedSystemPrompt = (injectedSystemPrompt || systemPrompt || '') +
-          `\n\n=== DATA REAL-TIME (SUDAH DIAMBIL OTOMATIS) ===\n${konteks}\n=== ANALISIS DATA DI ATAS DAN JAWAB PERTANYAAN USER ===`
+        // Inject sebagai pesan user eksplisit — lebih sulit diabaikan model
+        // daripada system prompt yang sering di-override instruksi internal
+        const pesanData = `[DATA RAILWAY SUDAH DIAMBIL OTOMATIS]\n\n${konteks}\n\n---\nBerdasarkan data di atas, jawab pertanyaan user.`
+        injectedMsgs = [
+          ...injectedMsgs.slice(0, -1),
+          { role: 'user' as const, content: pesanData },
+          { role: 'assistant' as const, content: 'Baik, saya sudah menerima data Railway. Saya akan analisis sekarang.' },
+          injectedMsgs[injectedMsgs.length - 1],
+        ]
       }
 
       // Mapping nama app ke service/deployment info Railway
