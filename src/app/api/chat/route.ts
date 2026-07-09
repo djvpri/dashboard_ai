@@ -134,11 +134,12 @@ export async function POST(req: NextRequest) {
           }
           const r = await fetch(url)
           const d = await r.json() as Record<string, unknown>
+          const label = depId ? depId.slice(0,8) : appKey || 'unknown'
           if (d.error) {
-            inject(`[LOG ERROR] Gagal ambil log deployment ${depId.slice(0,8)}: ${d.error}`)
+            inject(`[LOG ERROR] Gagal ambil log ${label}: ${d.error}`)
           } else {
             const errors = d.errors as string[] || []
-            inject(`[LOG DEPLOYMENT ${depId.slice(0,8)}...]\nTotal lines: ${d.totalLines}\nError count: ${d.errorCount}\n\n${errors.length > 0 ? `ERRORS:\n${errors.slice(0,20).join('\n')}\n\n` : 'Tidak ada error.\n\n'}LOG TERBARU:\n${d.recentLogs || '(kosong)'}`)
+            inject(`[LOG ${appKey?.toUpperCase() || label}]\nTotal lines: ${d.totalLines}\nError count: ${d.errorCount}\n\n${errors.length > 0 ? `ERRORS:\n${errors.slice(0,20).join('\n')}\n\n` : 'Tidak ada error.\n\n'}LOG TERBARU:\n${d.recentLogs || '(kosong)'}`)
           }
         } else if (teks.includes('semua project') || teks.includes('semua app') ||
             teks.includes('scan railway') || teks.includes('status semua') ||
