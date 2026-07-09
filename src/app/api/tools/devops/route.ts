@@ -19,6 +19,57 @@ export async function POST(req: NextRequest) {
   try {
     switch (action) {
 
+      case 'push_file': {
+        // Push file langsung ke GitHub repo — Ojamet bisa fix tanpa PAT dari user
+        // Token: GITHUB_TOKEN_ZPOS (sudah di env var Railway dashboard_ai)
+        const { repo, path: filePath, content, message, branch = 'main' } = body
+        if (!repo || !filePath || !content || !message) {
+          return NextResponse.json({ error: 'repo, path, content, message wajib diisi' }, { status: 400 })
+        }
+
+        const GITHUB_TOKEN = process.env.GITHUB_TOKEN_ZPOS
+        if (!GITHUB_TOKEN) return NextResponse.json({ error: 'GITHUB_TOKEN_ZPOS belum dikonfigurasi' }, { status: 503 })
+
+        // Ambil SHA file yang ada (kalau sudah ada)
+        const shaRes = await fetch(`https://api.github.com/repos/djvpri/${repo}/contents/${filePath}?ref=${branch}`, {
+          headers: {
+            'Authorization': `Bearer ${GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github+json',
+          },
+        })
+        const shaData = shaRes.ok ? await shaRes.json() : null
+        const sha = shaData?.sha
+
+        // Push file
+        const pushRes = await fetch(`https://api.github.com/repos/djvpri/${repo}/contents/${filePath}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${GITHUB_TOKEN}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/vnd.github+json',
+          },
+          body: JSON.stringify({
+            message,
+            content: Buffer.from(content).toString('base64'),
+            branch,
+            ...(sha ? { sha } : {}),
+          }),
+        })
+
+        if (!pushRes.ok) {
+          const err = await pushRes.text()
+          return NextResponse.json({ error: `GitHub API ${pushRes.status}: ${err.slice(0, 200)}` }, { status: 500 })
+        }
+
+        const pushData = await pushRes.json()
+        return NextResponse.json({
+          ok: true,
+          message: `✅ File ${filePath} berhasil di-push ke ${repo}/${branch}`,
+          commit: pushData.commit?.sha?.slice(0, 7),
+          url: pushData.content?.html_url,
+        })
+      }
+
       case 'redeploy': {
         // Trigger redeploy Railway untuk service tertentu via GraphQL API
         const { serviceId, environmentId } = body
