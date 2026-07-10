@@ -6,23 +6,39 @@ export const runtime = 'nodejs'
 
 const execAsync = promisify(exec)
 
-const BLOCKED = [
-  'rm -rf /',
-  'rm -rf /app',
-  'rm -rf /etc',
-  'mkfs',
-  ':(){:|:&};:',
+// Secret internal: endpoint ini menjalankan shell ARBITRARY, jadi tidak boleh
+// dipanggil langsung dari luar (middleware menandai /api/tools sebagai publik).
+// Hanya server (api/chat) yang mengirim header x-internal-secret ini.
+// FAIL-CLOSED: kalau INTERNAL_TOOL_SECRET belum diset, endpoint menolak semua.
+const INTERNAL_SECRET = process.env.INTERNAL_TOOL_SECRET || ''
+
+// Deny-list pertahanan lapis kedua (bukan kontrol utama — kontrol utama = auth).
+const BLOCKED: RegExp[] = [
+  /rm\s+-[rf]{1,2}\s+(\/(?:\s|$)|\/app|\/etc|\/root|\/home|~|\*)/,
+  /rm\s+-[rf]{1,2}\s+--no-preserve-root/,
+  /\bmkfs\b/,
+  /\bdd\s+if=/,
+  /:\s*\(\s*\)\s*\{.*\|.*&\s*\}\s*;/,          // fork bomb :(){ :|:& };:
+  /\b(shutdown|reboot|halt|poweroff|init\s+0)\b/,
+  /chmod\s+-R\s+0?777\s+\//,
+  />\s*\/dev\/sd[a-z]/,
+  /\|\s*(sh|bash)\b/,                            // curl ... | sh
 ]
 
 export async function POST(req: NextRequest) {
+  // Guard: wajib secret internal — menutup RCE terbuka ke publik.
+  if (!INTERNAL_SECRET || req.headers.get('x-internal-secret') !== INTERNAL_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const { cmd, cwd } = await req.json()
   if (!cmd || typeof cmd !== 'string') {
     return NextResponse.json({ error: 'cmd wajib diisi' }, { status: 400 })
   }
 
-  for (const blocked of BLOCKED) {
-    if (cmd.includes(blocked)) {
-      return NextResponse.json({ error: 'Command diblokir: ' + blocked }, { status: 403 })
+  for (const pat of BLOCKED) {
+    if (pat.test(cmd)) {
+      return NextResponse.json({ error: 'Command diblokir (pola berbahaya)' }, { status: 403 })
     }
   }
 

@@ -223,7 +223,10 @@ export async function POST(req: NextRequest) {
             console.log('[tool-injection] action: exec', cmd)
             const r = await fetch(`${BASE}/api/tools/exec`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'x-internal-secret': process.env.INTERNAL_TOOL_SECRET || '',
+              },
               body: JSON.stringify({ cmd }),
             })
             const d = await r.json() as Record<string, unknown>
