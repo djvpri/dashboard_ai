@@ -202,6 +202,18 @@ export async function POST(req: NextRequest) {
             inject(`[REDEPLOY] Tidak dapat mendeteksi service mana yang mau di-redeploy. Sebutkan nama app (zgym, zbengkel, dll) atau service ID-nya.`)
           }
         } else if (
+          teks.includes('hermes') && (
+            teks.includes('status') || teks.includes('health') ||
+            teks.includes('cek') || teks.includes('aktif') ||
+            teks.includes('online') || teks.includes('hidup')
+          )
+        ) {
+          console.log('[tool-injection] action: hermes status')
+          const r = await fetch(`${BASE}/api/tools/hermes`, { headers: internalHeaders() })
+          const d = await r.json() as Record<string, unknown>
+          const detail = typeof d.data === 'string' ? (d.data as string).slice(0, 400) : JSON.stringify(d.data ?? {}).slice(0, 400)
+          inject(`[STATUS HERMES-AGENT]\nOnline: ${d.online}\nEndpoint status: ${d.endpoint || '-'}\n${d.error ? `Catatan: ${d.error}\n` : ''}Detail: ${detail}`)
+        } else if (
           teks.includes('jalankan') || teks.includes('eksekusi') ||
           teks.includes('run cmd') || teks.includes('execute') ||
           teks.includes('terminal') || teks.includes('bash') ||
