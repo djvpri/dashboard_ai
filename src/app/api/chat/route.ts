@@ -225,7 +225,7 @@ export async function POST(req: NextRequest) {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'x-internal-secret': process.env.INTERNAL_TOOL_SECRET || '',
+                'x-internal-secret': process.env.INTERNAL_SECRET || '',
               },
               body: JSON.stringify({ cmd }),
             })

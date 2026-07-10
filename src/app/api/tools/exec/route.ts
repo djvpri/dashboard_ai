@@ -9,8 +9,9 @@ const execAsync = promisify(exec)
 // Secret internal: endpoint ini menjalankan shell ARBITRARY, jadi tidak boleh
 // dipanggil langsung dari luar (middleware menandai /api/tools sebagai publik).
 // Hanya server (api/chat) yang mengirim header x-internal-secret ini.
-// FAIL-CLOSED: kalau INTERNAL_TOOL_SECRET belum diset, endpoint menolak semua.
-const INTERNAL_SECRET = process.env.INTERNAL_TOOL_SECRET || ''
+// FAIL-CLOSED: kalau INTERNAL_SECRET belum diset, endpoint menolak semua.
+// (nama env sama dengan yang dipakai api/tools/terminal)
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET || ''
 
 // Deny-list pertahanan lapis kedua (bukan kontrol utama — kontrol utama = auth).
 const BLOCKED: RegExp[] = [
