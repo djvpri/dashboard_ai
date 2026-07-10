@@ -200,10 +200,24 @@ export async function POST(req: NextRequest) {
           } else {
             inject(`[REDEPLOY] Tidak dapat mendeteksi service mana yang mau di-redeploy. Sebutkan nama app (zgym, zbengkel, dll) atau service ID-nya.`)
           }
-        } else if (teks.includes('jalankan') || teks.includes('eksekusi') || teks.includes('run cmd') || teks.includes('execute')) {
-          // Deteksi command dalam backtick
-          const cmdMatch = (lastMsg.content as string).match(/`([^`]+)`/) ||
-            (lastMsg.content as string).match(/(?:jalankan|eksekusi|run|execute)\s+(.+)/i)
+        } else if (
+          teks.includes('jalankan') || teks.includes('eksekusi') ||
+          teks.includes('run cmd') || teks.includes('execute') ||
+          teks.includes('terminal') || teks.includes('bash') ||
+          teks.includes('df ') || teks.includes('df -') ||
+          teks.includes('ls ') || teks.includes('cat ') ||
+          teks.includes('git ') || teks.includes('npm ') ||
+          teks.includes('disk') || teks.includes('cek file') ||
+          teks.includes('cek folder') || teks.includes('pwd') ||
+          teks.includes('curl ') || teks.includes('ping ') ||
+          teks.includes('ps aux') || teks.includes('shell') ||
+          /`[^`]+`/.test(lastMsg.content as string)
+        ) {
+          // Deteksi command: dalam backtick, setelah kata kunci, atau pola command umum
+          const contentStr = lastMsg.content as string
+          const cmdMatch = contentStr.match(/`([^`]+)`/) ||
+            contentStr.match(/(?:jalankan|eksekusi|run|execute|bash)\s+["`]?([^"`\n]+)["`]?/i) ||
+            contentStr.match(/(df\s+-\S+|ls\s*\S*|cat\s+\S+|git\s+\S+|npm\s+\S+|pwd|curl\s+\S+|ps\s+aux|ping\s+\S+)/)
           if (cmdMatch) {
             const cmd = cmdMatch[1].trim()
             console.log('[tool-injection] action: exec', cmd)
@@ -214,6 +228,8 @@ export async function POST(req: NextRequest) {
             })
             const d = await r.json() as Record<string, unknown>
             inject(`[HASIL EXEC: ${cmd}]\nOK: ${d.ok}\nOUTPUT:\n${d.stdout || '(kosong)'}\n${d.stderr ? `STDERR:\n${d.stderr}` : ''}`)
+          } else {
+            inject(`[TERMINAL READY] Sebutkan command dalam backtick, contoh: \`df -h\` atau \`ls -la\``)
           }
         } else {
           console.log('[tool-injection] tidak ada kata kunci cocok')
