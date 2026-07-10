@@ -30,15 +30,26 @@ function pilihBackend(agentId: string, backendHint?: string): BackendTarget | { 
   // lewat header x-agent-backend dari ChatWindow
   const backend = backendHint || (agentId === 'hermes' ? 'hermes' : 'openclaw')
 
-  if (backend === 'hermes') {
-    if (!HERMES_API_URL || !HERMES_API_KEY) {
-      return {
-        error:
-          'Agent Hermes belum dikonfigurasi — isi env HERMES_API_URL & HERMES_API_KEY ' +
-          '(API server hermes-agent, aktifkan dengan API_SERVER_ENABLED=true + API_SERVER_KEY di service hermes-agent).',
-      }
+  // SEMUA agent kini menembak gateway Hermes yang sama (otak + tool penuh,
+  // identik dengan Hermes di WhatsApp). Ojamet vs Hermes cuma beda persona/
+  // system prompt. Gateway OpenClaw lama (GATEWAY_URL) sudah pensiun; dipakai
+  // hanya sebagai fallback kalau env Hermes belum diisi.
+  if (HERMES_API_URL && HERMES_API_KEY) {
+    return {
+      url: HERMES_API_URL,
+      token: HERMES_API_KEY,
+      model: 'hermes-agent',
+      label: backend === 'hermes' ? 'hermes' : 'ojamet',
     }
-    return { url: HERMES_API_URL, token: HERMES_API_KEY, model: 'hermes-agent', label: 'hermes' }
+  }
+
+  // Fallback: env Hermes belum dikonfigurasi.
+  if (backend === 'hermes') {
+    return {
+      error:
+        'Agent Hermes belum dikonfigurasi — isi env HERMES_API_URL & HERMES_API_KEY ' +
+        '(API server hermes-agent, aktifkan dengan API_SERVER_ENABLED=true + API_SERVER_KEY di service hermes-agent).',
+    }
   }
   return { url: GATEWAY_URL, token: GATEWAY_TOKEN, model: 'openclaw', label: 'openclaw' }
 }
