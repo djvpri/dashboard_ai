@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireInternal, internalHeaders } from '@/lib/internal-auth'
 
 export const runtime = 'nodejs'
 
@@ -7,12 +8,15 @@ const BASE = process.env.NEXTAUTH_URL || 'http://localhost:3000'
 async function callInternal(path: string, opts: RequestInit = {}): Promise<Record<string, unknown>> {
   const res = await fetch(`${BASE}${path}`, {
     ...opts,
-    headers: { 'Content-Type': 'application/json', ...opts.headers },
+    headers: { 'Content-Type': 'application/json', ...internalHeaders(), ...opts.headers },
   })
   return res.json()
 }
 
 export async function POST(req: NextRequest) {
+  const denied = requireInternal(req)
+  if (denied) return denied
+
   const body = await req.json()
   const { action } = body
 

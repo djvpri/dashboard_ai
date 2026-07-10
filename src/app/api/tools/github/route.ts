@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireInternal } from '@/lib/internal-auth'
 
 export const runtime = 'nodejs'
 
@@ -28,6 +29,9 @@ async function ghFetch(path: string, opts: RequestInit = {}) {
 // GET /api/tools/github?action=search&q=error+message
 // POST /api/tools/github  { action: 'pr', title, body, branch, files: [{path, content}] }
 export async function GET(req: NextRequest) {
+  const denied = requireInternal(req)
+  if (denied) return denied
+
   if (!GITHUB_TOKEN) {
     return NextResponse.json({ error: 'GITHUB_TOKEN_ZPOS belum dikonfigurasi' }, { status: 503 })
   }
@@ -83,6 +87,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = requireInternal(req)
+  if (denied) return denied
+
   if (!GITHUB_TOKEN) {
     return NextResponse.json({ error: 'GITHUB_TOKEN_ZPOS belum dikonfigurasi' }, { status: 503 })
   }

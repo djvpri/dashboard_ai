@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getAgent } from '@/lib/agents'
+import { internalHeaders } from '@/lib/internal-auth'
 
 // Backend OpenClaw (agent Ojamet):
 // clawdbot-railway-template memberi /v1/* jalur auth SENDIRI (Bearer +
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
 
       async function fetchTool(body: Record<string, unknown>): Promise<Record<string, unknown>> {
         const r = await fetch(`${BASE}/api/tools/devops`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...internalHeaders() },
           body: JSON.stringify(body),
         })
         return r.json()
@@ -137,7 +138,7 @@ export async function POST(req: NextRequest) {
             url += `&serviceId=${PROJECT_MAP[appKey].serviceId}`
             console.log('[tool-injection] action: logs by app', appKey)
           }
-          const r = await fetch(url)
+          const r = await fetch(url, { headers: internalHeaders() })
           const d = await r.json() as Record<string, unknown>
           const label = depId ? depId.slice(0,8) : appKey || 'unknown'
           if (d.error) {

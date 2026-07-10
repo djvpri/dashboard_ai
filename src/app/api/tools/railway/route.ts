@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireInternal } from '@/lib/internal-auth'
 
 export const runtime = 'nodejs'
 
@@ -31,6 +32,9 @@ async function gql(query: string, variables: Record<string, unknown> = {}) {
 }
 
 export async function GET(req: NextRequest) {
+  const denied = requireInternal(req)
+  if (denied) return denied
+
   if (!RAILWAY_TOKEN) {
     return NextResponse.json({ error: 'RAILWAY_TOKEN belum dikonfigurasi' }, { status: 503 })
   }
