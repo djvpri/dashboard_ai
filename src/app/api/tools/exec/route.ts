@@ -6,11 +6,13 @@ export const runtime = 'nodejs'
 
 const execAsync = promisify(exec)
 
-const ALLOWED_PREFIXES = [
-  'npm ', 'node ', 'npx ', 'ls ', 'cat ', 'echo ', 'pwd', 'git ', 'prisma ', 'railway ',
+const BLOCKED = [
+  'rm -rf /',
+  'rm -rf /app',
+  'rm -rf /etc',
+  'mkfs',
+  ':(){:|:&};:',
 ]
-
-const BLOCKED = ['rm -rf', 'sudo', 'curl http', 'wget ', 'chmod 777', '> /dev/']
 
 export async function POST(req: NextRequest) {
   const { cmd, cwd } = await req.json()
@@ -20,30 +22,29 @@ export async function POST(req: NextRequest) {
 
   for (const blocked of BLOCKED) {
     if (cmd.includes(blocked)) {
-      return NextResponse.json({ error: `Command diblokir: ${blocked}` }, { status: 403 })
+      return NextResponse.json({ error: 'Command diblokir: ' + blocked }, { status: 403 })
     }
-  }
-
-  const allowed = ALLOWED_PREFIXES.some(p => cmd.trim().startsWith(p)) || cmd.trim() === 'pwd'
-  if (!allowed) {
-    return NextResponse.json({
-      error: `Tidak diizinkan. Prefix yang boleh: ${ALLOWED_PREFIXES.join(', ')}`,
-    }, { status: 403 })
   }
 
   try {
     const { stdout, stderr } = await execAsync(cmd, {
       cwd: cwd || '/app',
-      timeout: 30000,
+      timeout: 60000,
       maxBuffer: 1024 * 1024,
+      shell: '/bin/bash',
+      env: {
+        ...process.env,
+        HOME: '/root',
+        PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/bin',
+      },
     })
-    return NextResponse.json({ ok: true, stdout: stdout.slice(0, 5000), stderr: stderr.slice(0, 1000) })
+    return NextResponse.json({ ok: true, stdout: stdout.slice(0, 8000), stderr: stderr.slice(0, 2000) })
   } catch (err) {
     const e = err as { stdout?: string; stderr?: string; message?: string }
     return NextResponse.json({
       ok: false,
-      stdout: e.stdout?.slice(0, 5000) || '',
-      stderr: e.stderr?.slice(0, 1000) || e.message || String(err),
+      stdout: e.stdout?.slice(0, 8000) || '',
+      stderr: e.stderr?.slice(0, 2000) || e.message || String(err),
     }, { status: 500 })
   }
 }
